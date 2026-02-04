@@ -498,6 +498,17 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Environment check endpoint
+app.get('/api/env-check', (req, res) => {
+  res.json({
+    hasDbUrl: !!process.env.DATABASE_URL,
+    hasBlobToken: !!process.env.BLOB_READ_WRITE_TOKEN,
+    hasJwtSecret: !!process.env.JWT_SECRET,
+    isVercel: process.env.VERCEL === '1',
+    nodeEnv: process.env.NODE_ENV
+  });
+});
+
 // Export the app for Vercel serverless functions
 export default app;
 

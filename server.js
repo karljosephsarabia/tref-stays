@@ -401,32 +401,53 @@ app.delete('/api/properties/:id', authenticateToken, async (req, res) => {
 // Image upload endpoint
 app.post('/api/upload/images', authenticateToken, upload.array('images', 10), async (req, res) => {
   try {
+    console.log('Upload request received');
+    console.log('Files count:', req.files?.length);
+    console.log('Has BLOB_READ_WRITE_TOKEN:', !!process.env.BLOB_READ_WRITE_TOKEN);
+    
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ error: 'No files uploaded' });
     }
 
-    // Check if running on Vercel
-    if (process.env.VERCEL === '1' && process.env.BLOB_READ_WRITE_TOKEN) {
-      // Upload to Vercel Blob storage
-      const uploadPromises = req.files.map(async (file) => {
-        const filename = `${Date.now()}-${Math.round(Math.random() * 1E9)}${path.extname(file.originalname)}`;
-        const blob = await put(filename, file.buffer, {
-          access: 'public',
-          token: process.env.BLOB_READ_WRITE_TOKEN,
+    // Check if running on Vercel with Blob storage
+    if (process.env.BLOB_READ_WRITE_TOKEN) {
+      console.log('Uploading to Vercel Blob storage...');
+      try {
+        // Upload to Vercel Blob storage
+        const uploadPromises = req.files.map(async (file) => {
+          const filename = `tref-stays/${Date.now()}-${Math.round(Math.random() * 1E9)}${path.extname(file.originalname)}`;
+          console.log('Uploading file:', filename, 'Size:', file.buffer?.length || file.size);
+          
+          const blob = await put(filename, file.buffer, {
+            access: 'public',
+          });
+          console.log('Blob uploaded successfully:', blob.url);
+          return blob.url;
         });
-        return blob.url;
-      });
 
-      const imageUrls = await Promise.all(uploadPromises);
-      res.json({ imageUrls });
+        const imageUrls = await Promise.all(uploadPromises);
+        console.log('All images uploaded successfully:', imageUrls.length);
+        res.json({ imageUrls });
+      } catch (blobError) {
+        console.error('Vercel Blob upload error:', blobError);
+        console.error('Error details:', JSON.stringify(blobError, null, 2));
+        throw blobError;
+      }
     } else {
       // Local development - use disk storage
+      console.log('Using local disk storage...');
       const imageUrls = req.files.map(file => `/uploads/${file.filename}`);
       res.json({ imageUrls });
     }
   } catch (error) {
     console.error('Error uploading images:', error);
-    res.status(500).json({ error: 'Failed to upload images' });
+    console.error('Error name:', error.name);
+    console.error('Error message:', error.message);
+    res.status(500).json({ 
+      error: 'Failed to upload images',
+      details: error.message,
+      name: error.name
+    });
   }
 });
 

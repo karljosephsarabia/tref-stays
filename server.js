@@ -19,18 +19,16 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
-// Ensure uploads directory exists (for local development only)
-const uploadsDir = path.join(__dirname, 'public', 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
-// Configure multer for image uploads (memory storage for Vercel)
-const storage = process.env.VERCEL === '1' 
+// Configure multer for image uploads (memory storage for Vercel, disk storage locally)
+const storage = process.env.VERCEL || process.env.VERCEL_ENV
   ? multer.memoryStorage() // Use memory storage on Vercel
-  : multer.diskStorage({    // Use disk storage locally
+  : multer.diskStorage({
       destination: function (req, file, cb) {
-        cb(null, uploadsDir);
+        const uploadDir = path.join(__dirname, 'public', 'uploads');
+        if (!fs.existsSync(uploadDir)) {
+          fs.mkdirSync(uploadDir, { recursive: true });
+        }
+        cb(null, uploadDir);
       },
       filename: function (req, file, cb) {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
@@ -41,7 +39,7 @@ const storage = process.env.VERCEL === '1'
 const upload = multer({
   storage: storage,
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
-  fileFilter: function (req, file, cb) {
+  fileFilter: (req, file, cb) => {
     const allowedTypes = /jpeg|jpg|png|gif|webp/;
     const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
     const mimetype = allowedTypes.test(file.mimetype);
@@ -49,7 +47,7 @@ const upload = multer({
     if (mimetype && extname) {
       return cb(null, true);
     } else {
-      cb(new Error('Only image files are allowed'));
+      cb(new Error('Only image files are allowed!'));
     }
   }
 });

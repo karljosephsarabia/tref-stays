@@ -8,6 +8,7 @@ import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import { put } from '@vercel/blob';
 
 const { Pool } = pg;
 
@@ -18,22 +19,24 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
-// Ensure uploads directory exists
+// Ensure uploads directory exists (for local development only)
 const uploadsDir = path.join(__dirname, 'public', 'uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-// Configure multer for image uploads
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, uploadsDir);
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
-  }
-});
+// Configure multer for image uploads (memory storage for Vercel)
+const storage = process.env.VERCEL === '1' 
+  ? multer.memoryStorage() // Use memory storage on Vercel
+  : multer.diskStorage({    // Use disk storage locally
+      destination: function (req, file, cb) {
+        cb(null, uploadsDir);
+      },
+      filename: function (req, file, cb) {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, uniqueSuffix + path.extname(file.originalname));
+      }
+    });
 
 const upload = multer({
   storage: storage,
@@ -402,8 +405,25 @@ app.post('/api/upload/images', authenticateToken, upload.array('images', 10), as
       return res.status(400).json({ error: 'No files uploaded' });
     }
 
-    const imageUrls = req.files.map(file => `/uploads/${file.filename}`);
-    res.json({ imageUrls });
+    // Check if running on Vercel
+    if (process.env.VERCEL === '1' && process.env.BLOB_READ_WRITE_TOKEN) {
+      // Upload to Vercel Blob storage
+      const uploadPromises = req.files.map(async (file) => {
+        const filename = `${Date.now()}-${Math.round(Math.random() * 1E9)}${path.extname(file.originalname)}`;
+        const blob = await put(filename, file.buffer, {
+          access: 'public',
+          token: process.env.BLOB_READ_WRITE_TOKEN,
+        });
+        return blob.url;
+      });
+
+      const imageUrls = await Promise.all(uploadPromises);
+      res.json({ imageUrls });
+    } else {
+      // Local development - use disk storage
+      const imageUrls = req.files.map(file => `/uploads/${file.filename}`);
+      res.json({ imageUrls });
+    }
   } catch (error) {
     console.error('Error uploading images:', error);
     res.status(500).json({ error: 'Failed to upload images' });

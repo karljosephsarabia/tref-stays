@@ -97,6 +97,14 @@ async function fetchProperties(
           if (imagesResponse.ok) {
             const images = await imagesResponse.json();
             const mainImage = images.find((img: any) => img.is_main) || images[0];
+            
+            // Handle both local paths and full URLs (Vercel Blob)
+            const imageUrl = mainImage?.image_url 
+              ? (mainImage.image_url.startsWith('http') 
+                  ? mainImage.image_url 
+                  : `${API_URL}${mainImage.image_url}`)
+              : null;
+            
             return {
               id: p.id,
               title: p.title,
@@ -110,7 +118,7 @@ async function fetchProperties(
               state: p.state,
               country: p.country,
               zipcode: p.zipcode,
-              main_image: mainImage ? `${API_URL}${mainImage.image_url}` : null,
+              main_image: imageUrl,
             };
           }
         } catch (err) {

@@ -24,8 +24,8 @@ const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
 // Configure multer for image uploads (memory storage for Vercel, disk storage locally)
-const storage = process.env.VERCEL || process.env.VERCEL_ENV
-  ? multer.memoryStorage() // Use memory storage on Vercel
+const storage = process.env.BLOB_READ_WRITE_TOKEN
+  ? multer.memoryStorage() // Use memory storage when blob token exists
   : multer.diskStorage({
       destination: function (req, file, cb) {
         const uploadDir = path.join(__dirname, 'public', 'uploads');

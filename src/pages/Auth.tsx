@@ -255,7 +255,7 @@ export default function Auth() {
       setStep(step + 1);
     }
   };
-
+ 
   const handleOwnerSignup = async () => {
     if (!validateOwnerStep()) return;
 
@@ -275,7 +275,7 @@ export default function Auth() {
       }
 
       const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
-
+      
       // Step 1: Upload images if any
       let imageUrls: string[] = [];
       if (uploadedImages.length > 0) {
@@ -287,12 +287,11 @@ export default function Auth() {
         const uploadResponse = await fetch(`${API_URL}/api/upload/images`, {
           method: 'POST',
           headers: {
-            'Content-Type': 'multipart/form-data', // Let the browser set this boundary automatically
             'Authorization': `Bearer ${token}`
           },
           body: formData
         });
-
+        console.log('Image upload response:', uploadResponse);
         if (!uploadResponse.ok) {
           throw new Error('Failed to upload images');
         }
@@ -300,7 +299,7 @@ export default function Auth() {
         const uploadData = await uploadResponse.json();
         imageUrls = uploadData.imageUrls;
       }
-
+      console.log(imageUrls);
       // Step 2: Create property
       const propertyPayload = {
         title: propertyData.title,

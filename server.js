@@ -403,26 +403,44 @@ app.delete('/api/properties/:id', authenticateToken, async (req, res) => {
 // Image upload endpoint
 app.post('/api/upload/images', authenticateToken, upload.array('images', 10), async (req, res) => {
   try {
+    console.log('=== Upload Debug Info ===');
     console.log('Upload request received');
     console.log('Files count:', req.files?.length);
     console.log('Has BLOB_READ_WRITE_TOKEN:', !!process.env.BLOB_READ_WRITE_TOKEN);
+    console.log('BLOB_READ_WRITE_TOKEN length:', process.env.BLOB_READ_WRITE_TOKEN?.length);
+    console.log('Is Vercel:', process.env.VERCEL === '1');
+    console.log('Files details:', req.files?.map(f => ({
+      fieldname: f.fieldname,
+      originalname: f.originalname,
+      mimetype: f.mimetype,
+      size: f.size,
+      hasBuffer: !!f.buffer,
+      bufferLength: f.buffer?.length
+    })));
     
     if (!req.files || req.files.length === 0) {
+      console.error('No files in request');
       return res.status(400).json({ error: 'No files uploaded' });
     }
 
-    // Check if running on Vercel with Blob storage
+    // Check if running with Blob storage token
     if (process.env.BLOB_READ_WRITE_TOKEN) {
       console.log('Uploading to Vercel Blob storage...');
       try {
         // Upload to Vercel Blob storage
         const uploadPromises = req.files.map(async (file) => {
+          if (!file.buffer) {
+            console.error(`File ${file.originalname} has no buffer`);
+            throw new Error(`File ${file.originalname} has no buffer - storage configuration issue`);
+          }
+          
           const filename = `tref-stays/${Date.now()}-${Math.round(Math.random() * 1E9)}${path.extname(file.originalname)}`;
-          console.log('Uploading file:', filename, 'Size:', file.buffer?.length || file.size);
+          console.log('Uploading file:', filename, 'Size:', file.buffer.length, 'Type:', file.mimetype);
           
           const blob = await put(filename, file.buffer, {
             access: 'public',
-            contentType: file.mimetype
+            contentType: file.mimetype,
+            token: process.env.BLOB_READ_WRITE_TOKEN
           });
           console.log('Blob uploaded successfully:', blob.url);
           return blob.url;
@@ -433,19 +451,25 @@ app.post('/api/upload/images', authenticateToken, upload.array('images', 10), as
         res.json({ imageUrls });
       } catch (blobError) {
         console.error('Vercel Blob upload error:', blobError);
-        console.error('Error details:', JSON.stringify(blobError, null, 2));
+        console.error('Error details:', {
+          name: blobError.name,
+          message: blobError.message,
+          stack: blobError.stack
+        });
         throw blobError;
       }
     } else {
       // Local development - use disk storage
       console.log('Using local disk storage...');
       const imageUrls = req.files.map(file => `/uploads/${file.filename}`);
+      console.log('Saved locally:', imageUrls);
       res.json({ imageUrls });
     }
   } catch (error) {
     console.error('Error uploading images:', error);
     console.error('Error name:', error.name);
     console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
     res.status(500).json({ 
       error: 'Failed to upload images',
       details: error.message,

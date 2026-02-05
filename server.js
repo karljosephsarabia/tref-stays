@@ -23,31 +23,17 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
-// Check if running on Vercel (serverless) - cannot write to disk
-const isVercel = process.env.VERCEL || process.env.VERCEL_ENV || process.env.VERCEL_URL;
-console.log('Environment check:', { 
+// ALWAYS use memory storage - Vercel has read-only filesystem
+// We'll handle where to save (Blob vs local) at request time
+const storage = multer.memoryStorage();
+
+console.log('Server starting with memory storage (safe for serverless)');
+console.log('Environment:', { 
   VERCEL: process.env.VERCEL, 
   VERCEL_ENV: process.env.VERCEL_ENV,
   BLOB_TOKEN_EXISTS: !!process.env.BLOB_READ_WRITE_TOKEN,
-  isVercel: !!isVercel
+  NODE_ENV: process.env.NODE_ENV
 });
-
-// Configure multer for image uploads (ALWAYS use memory storage on Vercel, disk storage only locally)
-const storage = isVercel
-  ? multer.memoryStorage() // Use memory storage on Vercel (read-only filesystem)
-  : multer.diskStorage({
-      destination: function (req, file, cb) {
-        const uploadDir = path.join(__dirname, 'public', 'uploads');
-        if (!fs.existsSync(uploadDir)) {
-          fs.mkdirSync(uploadDir, { recursive: true });
-        }
-        cb(null, uploadDir);
-      },
-      filename: function (req, file, cb) {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, uniqueSuffix + path.extname(file.originalname));
-      }
-    });
 
 const upload = multer({
   storage: storage,
@@ -477,10 +463,24 @@ app.post('/api/upload/images', authenticateToken, upload.array('images', 10), as
         throw blobError;
       }
     } else {
-      // Local development - use disk storage
+      // Local development - save buffer to disk manually
       console.log('Using local disk storage...');
-      const imageUrls = req.files.map(file => `/uploads/${file.filename}`);
-      console.log('Saved locally:', imageUrls);
+      const uploadDir = path.join(__dirname, 'public', 'uploads');
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+      
+      const imageUrls = await Promise.all(req.files.map(async (file) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const filename = uniqueSuffix + path.extname(file.originalname);
+        const filepath = path.join(uploadDir, filename);
+        
+        await fs.promises.writeFile(filepath, file.buffer);
+        console.log('Saved locally:', filename);
+        return `/uploads/${filename}`;
+      }));
+      
+      console.log('All files saved locally:', imageUrls);
       res.json({ imageUrls });
     }
   } catch (error) {

@@ -497,8 +497,8 @@ app.post('/api/properties/:id/images', authenticateToken, async (req, res) => {
   }
 });
 
-// Serve frontend for all other routes (SPA)
-app.get('*', (req, res) => {
+// Serve frontend for all non-API routes (SPA catch-all)
+app.get(/^(?!\/api).*$/, (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 

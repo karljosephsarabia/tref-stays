@@ -69,30 +69,16 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-// Middleware - CORS configuration
-const allowedOrigins = [
-  'http://localhost:8080',
-  'http://localhost:3000',
-  'http://localhost:5173',
-  process.env.RENDER_EXTERNAL_URL ? `https://${process.env.RENDER_EXTERNAL_URL}` : null,
-].filter(Boolean);
-
-console.log('🌐 Allowed CORS origins:', allowedOrigins);
+// Middleware - CORS configuration  
+// Frontend and backend are on same domain on Render, so CORS is permissive
+console.log('🌐 Environment:', process.env.NODE_ENV);
+console.log('🌐 Render URL:', process.env.RENDER_EXTERNAL_URL);
 
 app.use(cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin (mobile apps, curl, etc.)
-    if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === 'development') {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
+  origin: true, // Allow all origins (same domain on Render anyway)
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   preflightContinue: false,
   optionsSuccessStatus: 204
 }));

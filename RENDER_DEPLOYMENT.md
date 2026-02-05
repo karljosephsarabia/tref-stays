@@ -42,7 +42,7 @@ git push origin main
    - **Branch:** `main`
    - **Root Directory:** (leave empty)
    - **Environment:** `Node`
-   - **Build Command:** `npm install && npm run build`
+   - **Build Command:** `npm run render-build`
    - **Start Command:** `npm start`
    - **Plan:** Select your paid plan (Standard or higher)
 

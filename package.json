@@ -9,7 +9,7 @@
     "dev:all": "npm run server & npm run dev",
     "build": "vite build",
     "build:dev": "vite build --mode development",
-    "vercel-build": "vite build",
+    "render-build": "npm install --include=dev && vite build",
     "start": "node server.js",
     "lint": "eslint .",
     "preview": "vite preview"
@@ -45,7 +45,6 @@
     "@radix-ui/react-tooltip": "^1.2.7",
     "@supabase/supabase-js": "^2.90.1",
     "@tanstack/react-query": "^5.83.0",
-    "@vercel/blob": "^2.1.0",
     "bcrypt": "^6.0.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

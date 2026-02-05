@@ -119,19 +119,28 @@ app.get('/api/health', (req, res) => {
 
 // Auth middleware
 const authenticateToken = (req, res, next) => {
-  const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
-  
-  if (!token) {
-    return res.status(401).json({ error: 'Authentication required' });
-  }
-
-  jwt.verify(token, JWT_SECRET, (err, user) => {
-    if (err) {
-      return res.status(403).json({ error: 'Invalid or expired token' });
+  try {
+    // Try to get token from Authorization header or cookies
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1] || req.cookies?.token;
+    
+    if (!token) {
+      console.log('❌ No authentication token provided');
+      return res.status(401).json({ error: 'Authentication required' });
     }
-    req.user = user;
-    next();
-  });
+
+    jwt.verify(token, JWT_SECRET, (err, user) => {
+      if (err) {
+        console.error('❌ Token verification failed:', err.message);
+        return res.status(403).json({ error: 'Invalid or expired token' });
+      }
+      req.user = user;
+      next();
+    });
+  } catch (error) {
+    console.error('❌ Auth middleware error:', error);
+    return res.status(500).json({ error: 'Authentication error', details: error.message });
+  }
 };
 
 // API Routes
@@ -414,31 +423,66 @@ app.delete('/api/properties/:id', authenticateToken, async (req, res) => {
 app.post('/api/upload/images', authenticateToken, upload.array('images', 10), async (req, res) => {
   try {
     console.log('📤 Upload request received');
+    console.log('� User:', req.user);
     console.log('📁 Files count:', req.files?.length);
     console.log('📂 Upload directory:', uploadDir);
+    console.log('📂 Directory exists:', fs.existsSync(uploadDir));
     
     if (!req.files || req.files.length === 0) {
+      console.log('❌ No files in request');
       return res.status(400).json({ error: 'No files uploaded' });
     }
 
+    // Log each file
+    req.files.forEach((file, index) => {
+      console.log(`File ${index + 1}:`, {
+        fieldname: file.fieldname,
+        originalname: file.originalname,
+        filename: file.filename,
+        size: file.size,
+        mimetype: file.mimetype
+      });
+    });
+
     // Generate URLs for uploaded files
     const imageUrls = req.files.map(file => {
-      console.log('✅ File saved:', file.filename);
-      return `/uploads/${file.filename}`;
+      const url = `/uploads/${file.filename}`;
+      console.log('✅ File saved:', file.filename, '→', url);
+      return url;
     });
 
     console.log(`✅ ${imageUrls.length} image(s) uploaded successfully`);
     res.json({ imageUrls });
   } catch (error) {
-    console.error('Error uploading images:', error);
+    console.error('❌ Error uploading images:', error);
     console.error('Error name:', error.name);
     console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
     res.status(500).json({ 
       error: 'Failed to upload images',
       details: error.message,
       name: error.name
     });
   }
+});
+
+// Handle multer errors
+app.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    console.error('❌ Multer Error:', err);
+    return res.status(400).json({
+      error: 'File upload error',
+      details: err.message,
+      code: err.code
+    });
+  } else if (err) {
+    console.error('❌ Upload Error:', err);
+    return res.status(500).json({
+      error: 'Upload failed',
+      details: err.message
+    });
+  }
+  next();
 });
 
 // Get property images

@@ -8,7 +8,6 @@ import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
-import { put } from '@vercel/blob';
 import dotenv from 'dotenv';
 
 // Load environment variables from .env file
@@ -23,47 +22,62 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
-// ALWAYS use memory storage - Vercel has read-only filesystem
-// We'll handle where to save (Blob vs local) at request time
-const storage = multer.memoryStorage();
+// Determine upload directory based on environment
+// Render Persistent Disk is mounted at /data, local dev uses public/uploads
+const uploadDir = process.env.UPLOAD_DIR || path.join(__dirname, 'public', 'uploads');
 
-console.log('Server starting with memory storage (safe for serverless)');
-console.log('Environment:', { 
-  VERCEL: process.env.VERCEL, 
-  VERCEL_ENV: process.env.VERCEL_ENV,
-  BLOB_TOKEN_EXISTS: !!process.env.BLOB_READ_WRITE_TOKEN,
-  NODE_ENV: process.env.NODE_ENV
+console.log('🚀 Server initializing...');
+console.log('📁 Upload directory:', uploadDir);
+console.log('🌍 Environment:', process.env.NODE_ENV);
+
+// Create upload directory if it doesn't exist
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+  console.log('✅ Upload directory created');
+}
+
+// Configure multer for disk storage (works with Render Persistent Disk)
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  }
 });
 
 const upload = multer({
   storage: storage,
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
   fileFilter: (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|gif|webp/;
+    const allowedTypes = /jpeg|jpg|png|webp/;
     const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
     const mimetype = allowedTypes.test(file.mimetype);
     
     if (mimetype && extname) {
       return cb(null, true);
     } else {
-      cb(new Error('Only image files are allowed!'));
+      cb(new Error('Only image files (jpeg, jpg, png, webp) are allowed!'));
     }
   }
 });
 
 // Database connection
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || 'postgresql://trefstays_user:GZDT34HeX7aHIcnYlDHPwr5mZJoXxDjQ@dpg-d61nnksoud1c73agi30g-a.oregon-postgres.render.com/trefstays',
+  connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }
 });
 
-// Middleware - CORS must be first
+// Middleware - CORS configuration
 const allowedOrigins = [
   'http://localhost:8080',
   'http://localhost:3000',
-  process.env.VITE_API_URL,
-  process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
+  'http://localhost:5173',
+  process.env.RENDER_EXTERNAL_URL ? `https://${process.env.RENDER_EXTERNAL_URL}` : null,
 ].filter(Boolean);
+
+console.log('🌐 Allowed CORS origins:', allowedOrigins);
 
 app.use(cors({
   origin: function (origin, callback) {
@@ -85,7 +99,12 @@ app.use(cors({
 
 app.use(express.json());
 app.use(cookieParser());
-app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads')));
+
+// Serve uploaded images from persistent disk or local directory
+app.use('/uploads', express.static(uploadDir));
+
+// Serve static frontend files from dist folder
+app.use(express.static(path.join(__dirname, 'dist')));
 
 // Request logging
 app.use((req, res, next) => {
@@ -98,8 +117,18 @@ pool.query('SELECT NOW()', (err, res) => {
   if (err) {
     console.error('❌ Database connection error:', err);
   } else {
-    console.log('✓ Connected to PostgreSQL at', res.rows[0].now);
+    console.log('✅ Connected to PostgreSQL at', res.rows[0].now);
   }
+});
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'OK', 
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV,
+    uploadDir: uploadDir
+  });
 });
 
 // Auth middleware
@@ -395,99 +424,29 @@ app.delete('/api/properties/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// Image upload endpoint
+// Image upload endpoint - Using Persistent Disk on Render
 app.post('/api/upload/images', authenticateToken, upload.array('images', 10), async (req, res) => {
   try {
-    const isVercelEnv = process.env.VERCEL || process.env.VERCEL_ENV || process.env.VERCEL_URL;
-    
-    console.log('=== Upload Debug Info ===');
-    console.log('Upload request received');
-    console.log('Files count:', req.files?.length);
-    console.log('Has BLOB_READ_WRITE_TOKEN:', !!process.env.BLOB_READ_WRITE_TOKEN);
-    console.log('Is Vercel environment:', !!isVercelEnv);
-    console.log('Files details:', req.files?.map(f => ({
-      fieldname: f.fieldname,
-      originalname: f.originalname,
-      mimetype: f.mimetype,
-      size: f.size,
-      hasBuffer: !!f.buffer,
-      bufferLength: f.buffer?.length,
-      hasFilename: !!f.filename
-    })));
+    console.log('📤 Upload request received');
+    console.log('📁 Files count:', req.files?.length);
+    console.log('📂 Upload directory:', uploadDir);
     
     if (!req.files || req.files.length === 0) {
-      console.error('No files in request');
       return res.status(400).json({ error: 'No files uploaded' });
     }
 
-    // On Vercel - must use Blob storage
-    if (isVercelEnv) {
-      if (!process.env.BLOB_READ_WRITE_TOKEN) {
-        console.error('Running on Vercel but BLOB_READ_WRITE_TOKEN is not set!');
-        return res.status(500).json({ 
-          error: 'Server configuration error', 
-          details: 'BLOB_READ_WRITE_TOKEN environment variable is not configured on Vercel'
-        });
-      }
-      
-      console.log('Uploading to Vercel Blob storage...');
-      try {
-        const uploadPromises = req.files.map(async (file) => {
-          if (!file.buffer) {
-            console.error(`File ${file.originalname} has no buffer`);
-            throw new Error(`File ${file.originalname} has no buffer - memory storage not configured correctly`);
-          }
-          
-          const filename = `tref-stays/${Date.now()}-${Math.round(Math.random() * 1E9)}${path.extname(file.originalname)}`;
-          console.log('Uploading file:', filename, 'Size:', file.buffer.length, 'Type:', file.mimetype);
-          
-          const blob = await put(filename, file.buffer, {
-            access: 'public',
-            contentType: file.mimetype,
-            token: process.env.BLOB_READ_WRITE_TOKEN
-          });
-          console.log('Blob uploaded successfully:', blob.url);
-          return blob.url;
-        });
+    // Generate URLs for uploaded files
+    const imageUrls = req.files.map(file => {
+      console.log('✅ File saved:', file.filename);
+      return `/uploads/${file.filename}`;
+    });
 
-        const imageUrls = await Promise.all(uploadPromises);
-        console.log('All images uploaded successfully:', imageUrls.length);
-        res.json({ imageUrls });
-      } catch (blobError) {
-        console.error('Vercel Blob upload error:', blobError);
-        console.error('Error details:', {
-          name: blobError.name,
-          message: blobError.message,
-          stack: blobError.stack
-        });
-        throw blobError;
-      }
-    } else {
-      // Local development - save buffer to disk manually
-      console.log('Using local disk storage...');
-      const uploadDir = path.join(__dirname, 'public', 'uploads');
-      if (!fs.existsSync(uploadDir)) {
-        fs.mkdirSync(uploadDir, { recursive: true });
-      }
-      
-      const imageUrls = await Promise.all(req.files.map(async (file) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        const filename = uniqueSuffix + path.extname(file.originalname);
-        const filepath = path.join(uploadDir, filename);
-        
-        await fs.promises.writeFile(filepath, file.buffer);
-        console.log('Saved locally:', filename);
-        return `/uploads/${filename}`;
-      }));
-      
-      console.log('All files saved locally:', imageUrls);
-      res.json({ imageUrls });
-    }
+    console.log(`✅ ${imageUrls.length} image(s) uploaded successfully`);
+    res.json({ imageUrls });
   } catch (error) {
     console.error('Error uploading images:', error);
     console.error('Error name:', error.name);
     console.error('Error message:', error.message);
-    console.error('Error stack:', error.stack);
     res.status(500).json({ 
       error: 'Failed to upload images',
       details: error.message,
@@ -538,28 +497,22 @@ app.post('/api/properties/:id/images', authenticateToken, async (req, res) => {
   }
 });
 
-// Health check
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+// Serve frontend for all other routes (SPA)
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
-// Environment check endpoint
-app.get('/api/env-check', (req, res) => {
-  res.json({
-    hasDbUrl: !!process.env.DATABASE_URL,
-    hasBlobToken: !!process.env.BLOB_READ_WRITE_TOKEN,
-    hasJwtSecret: !!process.env.JWT_SECRET,
-    isVercel: process.env.VERCEL === '1',
-    nodeEnv: process.env.NODE_ENV
-  });
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Error:', err);
+  res.status(500).json({ error: err.message || 'Internal server error' });
 });
 
-// Export the app for Vercel serverless functions
+// Start server
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`✅ Server running on port ${PORT}`);
+  console.log(`📁 Upload directory: ${uploadDir}`);
+  console.log(`🌍 Environment: ${process.env.NODE_ENV}`);
+});
+
 export default app;
-
-// Only start the server if not in Vercel environment
-if (process.env.VERCEL !== '1') {
-  app.listen(PORT, () => {
-    console.log(`🚀 Server running on http://localhost:${PORT}`);
-  });
-}

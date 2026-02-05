@@ -287,6 +287,7 @@ export default function Auth() {
         const uploadResponse = await fetch(`${API_URL}/api/upload/images`, {
           method: 'POST',
           headers: {
+            'Content-Type': 'multipart/form-data', // Let the browser set this boundary automatically
             'Authorization': `Bearer ${token}`
           },
           body: formData

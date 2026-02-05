@@ -9,6 +9,10 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 import { put } from '@vercel/blob';
+import dotenv from 'dotenv';
+
+// Load environment variables from .env file
+dotenv.config();
 
 const { Pool } = pg;
 
@@ -418,6 +422,7 @@ app.post('/api/upload/images', authenticateToken, upload.array('images', 10), as
           
           const blob = await put(filename, file.buffer, {
             access: 'public',
+            contentType: file.mimetype
           });
           console.log('Blob uploaded successfully:', blob.url);
           return blob.url;

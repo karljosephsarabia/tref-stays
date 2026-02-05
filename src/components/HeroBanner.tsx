@@ -15,7 +15,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Search, MapPin, ChevronUp, Map, CalendarIcon, Users, Minus, Plus, Globe } from "lucide-react";
+import { Search, MapPin, CalendarIcon, Users, Minus, Plus } from "lucide-react";
 import { format } from "date-fns";
 import { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
@@ -37,7 +37,6 @@ const HeroBanner = ({ onSearch }: HeroBannerProps) => {
     from: new Date(),
     to: new Date(Date.now() + 86400000),
   });
-  const [showFilters, setShowFilters] = useState(false);
   const [country, setCountry] = useState("us");
   const [zipcode, setZipcode] = useState("");
   const [adults, setAdults] = useState(1);
@@ -125,7 +124,7 @@ const HeroBanner = ({ onSearch }: HeroBannerProps) => {
         className="relative z-10 flex-1 flex flex-col items-center justify-center px-3 pt-14 md:pt-24 pb-4 md:pb-8"
       >
         <motion.div
-          className="flex flex-col items-center max-w-4xl"
+          className="flex flex-col items-center max-w-5xl"
           variants={heroStagger}
           initial="hidden"
           animate="show"
@@ -153,157 +152,147 @@ const HeroBanner = ({ onSearch }: HeroBannerProps) => {
             Discover unique stays and experiences around the world.
           </motion.p>
 
-          {/* Glass morphism search card - fade in with delay */}
+          {/* Search card - matching the design image */}
           <motion.div
             variants={itemUp}
             transition={{ duration: 0.6, delay: 0.3, ease: "easeOut" }}
-            className="w-full max-w-5xl"
+            className="w-full max-w-6xl px-2"
           >
-            <div className="bg-white/85 backdrop-blur-xl rounded-xl md:rounded-2xl shadow-2xl shadow-black/25 border border-white/30 overflow-hidden">
-              <div className="p-3 md:p-4 flex flex-col md:flex-row md:flex-wrap items-stretch md:items-center gap-2 md:gap-3">
-                <Select value={country} onValueChange={setCountry}>
-                  <SelectTrigger className="w-full md:w-[160px] h-11 border-border bg-background/80">
-                    <Globe className="h-4 w-4 mr-2 text-muted-foreground" />
-                    <SelectValue placeholder="Country" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-background border-border z-50">
-                    <SelectItem value="us">🇺🇸 United States</SelectItem>
-                    <SelectItem value="ca">🇨🇦 Canada</SelectItem>
-                    <SelectItem value="uk">🇬🇧 United Kingdom</SelectItem>
-                    <SelectItem value="be">🇧🇪 Belgium</SelectItem>
-                    <SelectItem value="il">🇮🇱 Israel</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <div className="flex-1 min-w-0 md:min-w-[160px]">
-                  <div className="relative">
-                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      type="text"
-                      placeholder="Enter Zipcode"
-                      value={zipcode}
-                      onChange={(e) => setZipcode(e.target.value)}
-                      className="pl-10 h-11 border-border bg-background/80 focus:ring-2 focus:ring-primary/30 transition-shadow"
-                    />
-                  </div>
+            <div className="relative bg-white/5 backdrop-blur-2xl rounded-3xl shadow-2xl shadow-black/50 border border-white/20">
+              <div className="flex flex-col lg:flex-row items-stretch lg:items-center">
+                {/* Location Section */}
+                <div className="flex-1 p-4 lg:p-6 border-b lg:border-b-0 lg:border-r border-white/20">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <div className="flex items-start gap-3 cursor-pointer group">
+                        <MapPin className="h-5 w-5 text-white/70 group-hover:text-white transition-colors flex-shrink-0 mt-0.5" />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-medium text-white/60 mb-1">Location</div>
+                          <div className="text-sm lg:text-base font-medium text-white truncate">
+                            {country === "us" && "US United States"}
+                            {country === "ca" && "Canada"}
+                            {country === "uk" && "United Kingdom"}
+                            {country === "be" && "Belgium"}
+                            {country === "il" && "Israel"}
+                            {zipcode ? ` - ${zipcode}` : " or Enter Zipcode"}
+                          </div>
+                        </div>
+                      </div>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-80 p-4 bg-background border-border" align="start">
+                      <div className="space-y-3">
+                        <div>
+                          <label className="text-sm font-medium mb-2 block">Country</label>
+                          <Select value={country} onValueChange={setCountry}>
+                            <SelectTrigger className="w-full">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="us">US United States</SelectItem>
+                              <SelectItem value="ca">Canada</SelectItem>
+                              <SelectItem value="uk">United Kingdom</SelectItem>
+                              <SelectItem value="be">Belgium</SelectItem>
+                              <SelectItem value="il">Israel</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium mb-2 block">Zipcode</label>
+                          <Input
+                            type="text"
+                            placeholder="Enter Zipcode"
+                            value={zipcode}
+                            onChange={(e) => setZipcode(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                 </div>
 
-                <Select defaultValue="short-term">
-                  <SelectTrigger className="w-full md:w-[180px] h-11 border-border bg-background/80">
-                    <SelectValue placeholder="Property type..." />
-                  </SelectTrigger>
-                  <SelectContent className="bg-background border-border">
-                    <SelectItem value="short-term" className="font-medium">Short Term Rent</SelectItem>
-                    <SelectItem value="long-term">Long Term Rent</SelectItem>
-                    <SelectItem value="sale">Sale</SelectItem>
-                  </SelectContent>
-                </Select>
+                {/* Date Range Section */}
+                <div className="flex-1 p-4 lg:p-6 border-b lg:border-b-0 lg:border-r border-white/10">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <div className="flex items-start gap-3 cursor-pointer group">
+                        <CalendarIcon className="h-5 w-5 text-white/70 group-hover:text-white transition-colors flex-shrink-0 mt-0.5" />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-medium text-white/60 mb-1">Date Range</div>
+                          <div className="text-sm lg:text-base font-medium text-white truncate">
+                            {dateRange?.from && dateRange?.to
+                              ? `${format(dateRange.from, "MM/dd/yyyy")} - ${format(dateRange.to, "MM/dd/yyyy")}`
+                              : "Select dates"}
+                          </div>
+                        </div>
+                      </div>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0 bg-background border-border" align="start">
+                      <Calendar
+                        initialFocus
+                        mode="range"
+                        defaultMonth={dateRange?.from}
+                        selected={dateRange}
+                        onSelect={setDateRange}
+                        numberOfMonths={2}
+                        className="p-3"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
 
-                <div className="flex gap-2 md:contents">
+                {/* Guests/Type Section */}
+                <div className="flex-1 p-4 lg:p-6 lg:pr-32">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <div className="flex items-start gap-3 cursor-pointer group">
+                        <Users className="h-5 w-5 text-white/70 group-hover:text-white transition-colors flex-shrink-0 mt-0.5" />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-medium text-white/60 mb-1">Guests/Type</div>
+                          <div className="text-sm lg:text-base font-medium text-white truncate">
+                            Short Term Rent, {totalGuests} Guest{totalGuests !== 1 ? 's' : ''}
+                          </div>
+                        </div>
+                      </div>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-80 p-0 bg-background border-border" align="start">
+                      <div className="p-4 border-b border-border">
+                        <label className="text-sm font-medium mb-2 block">Property Type</label>
+                        <Select defaultValue="short-term">
+                          <SelectTrigger className="w-full">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="short-term">Short Term Rent</SelectItem>
+                            <SelectItem value="long-term">Long Term Rent</SelectItem>
+                            <SelectItem value="sale">Sale</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="p-4">
+                        <div className="text-sm font-medium mb-3">Guests</div>
+                        <div className="space-y-1">
+                          <GuestCounter label="Adults" description="Ages 13+" value={adults} onChange={setAdults} min={1} />
+                          <div className="border-t border-border" />
+                          <GuestCounter label="Children" description="Ages 2-12" value={kids} onChange={setKids} />
+                          <div className="border-t border-border" />
+                          <GuestCounter label="Infants" description="Under 2" value={babies} onChange={setBabies} />
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                {/* Search Button - Positioned absolutely on desktop */}
+                <div className="p-4 lg:absolute lg:right-[-74px] lg:top-1/2 lg:-translate-y-1/2 flex justify-center">
                   <Button
-                    variant="outline"
-                    className="flex-1 md:flex-none h-11 gap-2 border-border bg-background/80"
-                    onClick={() => setShowFilters(!showFilters)}
-                  >
-                    <ChevronUp className={cn("h-4 w-4 transition-transform", showFilters ? "" : "rotate-180")} />
-                    <span className="md:inline">Filters</span>
-                    <span className="hidden lg:inline text-muted-foreground text-sm">
-                      {dateRange?.from && dateRange?.to
-                        ? `${format(dateRange.from, "MM/dd/yyyy")} - ${format(dateRange.to, "MM/dd/yyyy")}`
-                        : ""}
-                    </span>
-                  </Button>
-
-                  <Button 
-                    className="flex-1 md:flex-none h-11 bg-gradient-to-r from-primary to-primary/90 text-primary-foreground hover:opacity-95 gap-2 px-4 md:px-6 font-semibold shadow-lg shadow-primary/25 transition-all hover:scale-[1.02] active:scale-[0.98]"
                     onClick={() => onSearch(country, zipcode)}
+                    className="w-full lg:w-40 lg:h-40 h-14 rounded-full bg-gradient-to-br from-blue-500 via-blue-600 to-blue-700 hover:from-blue-600 hover:via-blue-700 hover:to-blue-800 text-white shadow-2xl hover:shadow-blue-500/50 transition-all duration-300 hover:scale-105 active:scale-95 flex flex-row lg:flex-col items-center justify-center gap-1 lg:gap-2 font-bold"
                   >
-                    <Search className="h-4 w-4" />
-                    <span className="hidden sm:inline">Search</span>
-                  </Button>
-
-                  <Button variant="outline" className="h-11 gap-2 border-border bg-background/80 px-3 md:px-4">
-                    <Map className="h-4 w-4" />
-                    <span className="hidden sm:inline">Map</span>
+                    <Search className="!h-6 !w-6 lg:!h-10 lg:!w-10" />
+                    <span className="text-base lg:text-xl">Search</span>
                   </Button>
                 </div>
               </div>
-
-              {showFilters && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: "auto", opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.3, ease: "easeInOut" }}
-                  className="overflow-hidden"
-                >
-                  <div className="px-3 md:px-4 pb-3 md:pb-4 border-t border-border pt-3 md:pt-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
-                      <div>
-                        <label className="text-sm font-medium text-foreground mb-2 block">Check in / Check out</label>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button variant="outline" className="w-full h-11 justify-start border-border bg-muted/30 font-normal text-sm">
-                              <CalendarIcon className="h-4 w-4 mr-2 text-muted-foreground flex-shrink-0" />
-                              <span className="truncate">
-                                {dateRange?.from && dateRange?.to
-                                  ? `${format(dateRange.from, "MM/dd")} - ${format(dateRange.to, "MM/dd/yy")}`
-                                  : "Select dates"}
-                              </span>
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0 bg-background border-border" align="start">
-                            <Calendar
-                              initialFocus
-                              mode="range"
-                              defaultMonth={dateRange?.from}
-                              selected={dateRange}
-                              onSelect={setDateRange}
-                              numberOfMonths={1}
-                              className={cn("p-3 pointer-events-auto")}
-                            />
-                          </PopoverContent>
-                        </Popover>
-                      </div>
-
-                      <div>
-                        <label className="text-sm font-medium text-foreground mb-2 block">Guests</label>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button variant="outline" className="w-full h-11 justify-start border-border bg-muted/30 font-normal text-sm">
-                              <Users className="h-4 w-4 mr-2 text-muted-foreground flex-shrink-0" />
-                              <span className="truncate">
-                                {totalGuests > 0
-                                  ? `${adults} Adult${adults !== 1 ? "s" : ""}${kids > 0 ? `, ${kids} Kid${kids !== 1 ? "s" : ""}` : ""}${babies > 0 ? `, ${babies} Baby` : ""}`
-                                  : "Add Guests"}
-                              </span>
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-72 sm:w-80 p-4 bg-background border-border" align="start">
-                            <div className="space-y-1">
-                              <GuestCounter label="Adults" description="Ages 13 or above" value={adults} onChange={setAdults} min={1} />
-                              <div className="border-t border-border" />
-                              <GuestCounter label="Children" description="Ages 2-12" value={kids} onChange={setKids} />
-                              <div className="border-t border-border" />
-                              <GuestCounter label="Infants" description="Under 2" value={babies} onChange={setBabies} />
-                            </div>
-                          </PopoverContent>
-                        </Popover>
-                      </div>
-
-                      <div className="sm:col-span-2 md:col-span-1">
-                        <label className="text-sm font-medium text-foreground mb-2 block">Beds</label>
-                        <Input placeholder="Add Beds" className="h-11 border-border bg-muted/30" />
-                      </div>
-
-                      <div className="sm:col-span-2 md:col-span-3">
-                        <label className="text-sm font-medium text-foreground mb-2 block">Amenities</label>
-                        <Input placeholder="WiFi, Pool, Parking, Pet Friendly..." className="h-11 border-border bg-muted/30" />
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
             </div>
           </motion.div>
         </motion.div>

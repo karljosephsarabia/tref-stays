@@ -23,9 +23,18 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
-// Configure multer for image uploads (memory storage for Vercel, disk storage locally)
-const storage = (process.env.VERCEL === '1' || process.env.BLOB_READ_WRITE_TOKEN)
-  ? multer.memoryStorage() // Use memory storage on Vercel or when blob token exists
+// Check if running on Vercel (serverless) - cannot write to disk
+const isVercel = process.env.VERCEL || process.env.VERCEL_ENV || process.env.VERCEL_URL;
+console.log('Environment check:', { 
+  VERCEL: process.env.VERCEL, 
+  VERCEL_ENV: process.env.VERCEL_ENV,
+  BLOB_TOKEN_EXISTS: !!process.env.BLOB_READ_WRITE_TOKEN,
+  isVercel: !!isVercel
+});
+
+// Configure multer for image uploads (ALWAYS use memory storage on Vercel, disk storage only locally)
+const storage = isVercel
+  ? multer.memoryStorage() // Use memory storage on Vercel (read-only filesystem)
   : multer.diskStorage({
       destination: function (req, file, cb) {
         const uploadDir = path.join(__dirname, 'public', 'uploads');
@@ -403,19 +412,21 @@ app.delete('/api/properties/:id', authenticateToken, async (req, res) => {
 // Image upload endpoint
 app.post('/api/upload/images', authenticateToken, upload.array('images', 10), async (req, res) => {
   try {
+    const isVercelEnv = process.env.VERCEL || process.env.VERCEL_ENV || process.env.VERCEL_URL;
+    
     console.log('=== Upload Debug Info ===');
     console.log('Upload request received');
     console.log('Files count:', req.files?.length);
     console.log('Has BLOB_READ_WRITE_TOKEN:', !!process.env.BLOB_READ_WRITE_TOKEN);
-    console.log('BLOB_READ_WRITE_TOKEN length:', process.env.BLOB_READ_WRITE_TOKEN?.length);
-    console.log('Is Vercel:', process.env.VERCEL === '1');
+    console.log('Is Vercel environment:', !!isVercelEnv);
     console.log('Files details:', req.files?.map(f => ({
       fieldname: f.fieldname,
       originalname: f.originalname,
       mimetype: f.mimetype,
       size: f.size,
       hasBuffer: !!f.buffer,
-      bufferLength: f.buffer?.length
+      bufferLength: f.buffer?.length,
+      hasFilename: !!f.filename
     })));
     
     if (!req.files || req.files.length === 0) {
@@ -423,15 +434,22 @@ app.post('/api/upload/images', authenticateToken, upload.array('images', 10), as
       return res.status(400).json({ error: 'No files uploaded' });
     }
 
-    // Check if running with Blob storage token
-    if (process.env.BLOB_READ_WRITE_TOKEN) {
+    // On Vercel - must use Blob storage
+    if (isVercelEnv) {
+      if (!process.env.BLOB_READ_WRITE_TOKEN) {
+        console.error('Running on Vercel but BLOB_READ_WRITE_TOKEN is not set!');
+        return res.status(500).json({ 
+          error: 'Server configuration error', 
+          details: 'BLOB_READ_WRITE_TOKEN environment variable is not configured on Vercel'
+        });
+      }
+      
       console.log('Uploading to Vercel Blob storage...');
       try {
-        // Upload to Vercel Blob storage
         const uploadPromises = req.files.map(async (file) => {
           if (!file.buffer) {
             console.error(`File ${file.originalname} has no buffer`);
-            throw new Error(`File ${file.originalname} has no buffer - storage configuration issue`);
+            throw new Error(`File ${file.originalname} has no buffer - memory storage not configured correctly`);
           }
           
           const filename = `tref-stays/${Date.now()}-${Math.round(Math.random() * 1E9)}${path.extname(file.originalname)}`;

@@ -283,9 +283,7 @@ app.get('/api/properties', async (req, res) => {
     // Parse amenities from JSON string to array
     const properties = result.rows.map(property => ({
       ...property,
-      amenities: typeof property.amenities === 'string' ? JSON.parse(property.amenities) : (property.amenities || []),
-      custom_kosher_amenities: typeof property.custom_kosher_amenities === 'string' ? JSON.parse(property.custom_kosher_amenities) : (property.custom_kosher_amenities || []),
-      custom_nearby_places: typeof property.custom_nearby_places === 'string' ? JSON.parse(property.custom_nearby_places) : (property.custom_nearby_places || [])
+      amenities: typeof property.amenities === 'string' ? JSON.parse(property.amenities) : (property.amenities || [])
     }));
     
     console.log(`  ✅ Found ${properties.length} properties`);
@@ -309,9 +307,7 @@ app.get('/api/properties/:id', async (req, res) => {
     // Parse amenities from JSON string to array
     const property = {
       ...result.rows[0],
-      amenities: typeof result.rows[0].amenities === 'string' ? JSON.parse(result.rows[0].amenities) : (result.rows[0].amenities || []),
-      custom_kosher_amenities: typeof result.rows[0].custom_kosher_amenities === 'string' ? JSON.parse(result.rows[0].custom_kosher_amenities) : (result.rows[0].custom_kosher_amenities || []),
-      custom_nearby_places: typeof result.rows[0].custom_nearby_places === 'string' ? JSON.parse(result.rows[0].custom_nearby_places) : (result.rows[0].custom_nearby_places || [])
+      amenities: typeof result.rows[0].amenities === 'string' ? JSON.parse(result.rows[0].amenities) : (result.rows[0].amenities || [])
     };
 
     res.json(property);
@@ -326,9 +322,6 @@ app.post('/api/properties', authenticateToken, async (req, res) => {
   try {
     console.log('Creating property for user:', req.user.id);
     console.log('Property data:', req.body);
-    console.log('🔍 Custom fields received:');
-    console.log('  - custom_kosher_amenities:', req.body.custom_kosher_amenities);
-    console.log('  - custom_nearby_places:', req.body.custom_nearby_places);
     
     const {
       title, property_type, bedroom_count, bathroom_count, guest_count,
@@ -336,43 +329,11 @@ app.post('/api/properties', authenticateToken, async (req, res) => {
       map_lat, map_lng, map_address, additional_luxury, additional_information,
       amenities, kosher_kitchen, shabbos_friendly,
       nearby_shul, nearby_shul_distance, nearby_kosher_shops, nearby_kosher_shops_distance,
-      nearby_mikva, nearby_mikva_distance, custom_kosher_amenities, custom_nearby_places
+      nearby_mikva, nearby_mikva_distance
     } = req.body;
 
     // Use authenticated user's ID as owner_id
     const owner_id = req.user.id;
-
-    console.log('🔧 Preparing to stringify custom fields:');
-    console.log('  - custom_kosher_amenities type:', typeof custom_kosher_amenities);
-    console.log('  - custom_kosher_amenities value:', JSON.stringify(custom_kosher_amenities));
-    console.log('  - custom_nearby_places type:', typeof custom_nearby_places);
-    console.log('  - custom_nearby_places value:', JSON.stringify(custom_nearby_places));
-
-    // Prepare the stringified values
-    const stringifiedCustomKosher = custom_kosher_amenities ? JSON.stringify(custom_kosher_amenities) : '[]';
-    const stringifiedCustomNearby = custom_nearby_places ? JSON.stringify(custom_nearby_places) : '[]';
-    
-    console.log('📝 Stringified values for database:');
-    console.log('  - stringifiedCustomKosher:', stringifiedCustomKosher);
-    console.log('  - stringifiedCustomNearby:', stringifiedCustomNearby);
-
-    const queryParams = [
-      owner_id, title, property_type, bedroom_count, bathroom_count, guest_count,
-      price, currency, street_name, house_number, address, city, state, country, zipcode,
-      map_lat, map_lng, map_address, additional_luxury, additional_information,
-      amenities ? JSON.stringify(amenities) : '[]', kosher_kitchen || false, shabbos_friendly || false,
-      nearby_shul || null, nearby_shul_distance || null, nearby_kosher_shops || null, nearby_kosher_shops_distance || null,
-      nearby_mikva || null, nearby_mikva_distance || null,
-      stringifiedCustomKosher,
-      stringifiedCustomNearby
-    ];
-    
-    console.log('🔢 Query params array length:', queryParams.length);
-    console.log('🔢 Query params positions 28-31:');
-    console.log('  - Position 28 (nearby_mikva_distance):', queryParams[28]);
-    console.log('  - Position 29 (custom_kosher_amenities):', queryParams[29]);
-    console.log('  - Position 30 (custom_nearby_places):', queryParams[30]);
-    console.log('🔢 Full queryParams:', JSON.stringify(queryParams, null, 2));
 
     const result = await pool.query(`
       INSERT INTO rs_properties (
@@ -381,14 +342,19 @@ app.post('/api/properties', authenticateToken, async (req, res) => {
         map_lat, map_lng, map_address, additional_luxury, additional_information,
         amenities, kosher_kitchen, shabbos_friendly,
         nearby_shul, nearby_shul_distance, nearby_kosher_shops, nearby_kosher_shops_distance,
-        nearby_mikva, nearby_mikva_distance, custom_kosher_amenities, custom_nearby_places, active
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, true)
+        nearby_mikva, nearby_mikva_distance, active
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, true)
       RETURNING *
-    `, queryParams);
+    `, [
+      owner_id, title, property_type, bedroom_count, bathroom_count, guest_count,
+      price, currency, street_name, house_number, address, city, state, country, zipcode,
+      map_lat, map_lng, map_address, additional_luxury, additional_information,
+      amenities ? JSON.stringify(amenities) : '[]', kosher_kitchen || false, shabbos_friendly || false,
+      nearby_shul || null, nearby_shul_distance || null, nearby_kosher_shops || null, nearby_kosher_shops_distance || null,
+      nearby_mikva || null, nearby_mikva_distance || null
+    ]);
 
-    console.log('✅ Property created successfully, ID:', result.rows[0].id);
-    console.log('📊 Returned from DB - custom_kosher_amenities:', result.rows[0].custom_kosher_amenities);
-    console.log('📊 Returned from DB - custom_nearby_places:', result.rows[0].custom_nearby_places);
+    console.log('Property created successfully:', result.rows[0].id);
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('Error creating property:', error);
@@ -622,48 +588,6 @@ app.get('/api/reservations/test', async (req, res) => {
       error: error.message,
       tableStructure: 'Check failed',
       success: false 
-    });
-  }
-});
-
-// Debug endpoint to check custom fields columns and test INSERT
-app.get('/api/debug/custom-fields', async (req, res) => {
-  try {
-    // Check column info for custom fields
-    const columnInfo = await pool.query(`
-      SELECT column_name, data_type, column_default, is_nullable
-      FROM information_schema.columns 
-      WHERE table_name = 'rs_properties' 
-      AND column_name IN ('custom_kosher_amenities', 'custom_nearby_places')
-      ORDER BY ordinal_position
-    `);
-    
-    // Get a recent property to see what's stored
-    const recentProperty = await pool.query(`
-      SELECT id, title, custom_kosher_amenities, custom_nearby_places 
-      FROM rs_properties 
-      ORDER BY id DESC LIMIT 3
-    `);
-    
-    // Test a direct UPDATE on an existing property
-    const testValue = JSON.stringify([{name: 'Debug Test', checked: true}]);
-    const testUpdate = await pool.query(`
-      UPDATE rs_properties 
-      SET custom_kosher_amenities = $1 
-      WHERE id = (SELECT MAX(id) FROM rs_properties)
-      RETURNING id, custom_kosher_amenities
-    `, [testValue]);
-    
-    res.json({
-      columnInfo: columnInfo.rows,
-      recentProperties: recentProperty.rows,
-      testUpdate: testUpdate.rows[0],
-      testValueUsed: testValue
-    });
-  } catch (error) {
-    res.status(500).json({ 
-      error: error.message,
-      stack: error.stack
     });
   }
 });

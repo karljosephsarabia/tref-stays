@@ -85,6 +85,12 @@ app.use(express.json());
 app.use(cookieParser());
 app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads')));
 
+// Serve Vite built frontend (dist/ folder)
+const distPath = path.join(__dirname, 'dist');
+if (fs.existsSync(distPath)) {
+  app.use(express.static(distPath));
+}
+
 // Request logging
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
@@ -601,6 +607,14 @@ app.get('/api/env-check', (req, res) => {
     nodeEnv: process.env.NODE_ENV
   });
 });
+
+// Catch-all: serve index.html for client-side routing (must be after all API routes)
+const distPath2 = path.join(__dirname, 'dist');
+if (fs.existsSync(distPath2)) {
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(distPath2, 'index.html'));
+  });
+}
 
 // Export the app for Vercel serverless functions
 export default app;

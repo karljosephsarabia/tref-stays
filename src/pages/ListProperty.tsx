@@ -134,6 +134,15 @@ export default function ListProperty() {
   const [customNearbyPlace, setCustomNearbyPlace] = useState({ type: "", name: "", distance: "" });
   const [customNearbyPlaces, setCustomNearbyPlaces] = useState<{ type: string; name: string; distance: string }[]>([]);
 
+  // Debug: Track state changes
+  useEffect(() => {
+    console.log('🔄 [ListProperty.tsx] State updated - customKosherAmenities:', customKosherAmenities);
+  }, [customKosherAmenities]);
+
+  useEffect(() => {
+    console.log('🔄 [ListProperty.tsx] State updated - customNearbyPlaces:', customNearbyPlaces);
+  }, [customNearbyPlaces]);
+
   useEffect(() => {
     if (!authLoading && !user) {
       navigate("/auth", { replace: true });
@@ -174,9 +183,16 @@ export default function ListProperty() {
 
   const addCustomKosherAmenity = () => {
     const trimmed = customKosherAmenity.trim();
+    console.log('➕ [ListProperty.tsx] Adding custom kosher amenity:', trimmed);
     if (trimmed && !customKosherAmenities.find(a => a.name === trimmed)) {
-      setCustomKosherAmenities(prev => [...prev, { name: trimmed, checked: true }]);
+      setCustomKosherAmenities(prev => {
+        const updated = [...prev, { name: trimmed, checked: true }];
+        console.log('  ✅ Updated customKosherAmenities:', updated);
+        return updated;
+      });
       setCustomKosherAmenity("");
+    } else {
+      console.log('  ❌ Skipped - empty or duplicate');
     }
   };
 
@@ -191,9 +207,16 @@ export default function ListProperty() {
   };
 
   const addCustomNearbyPlace = () => {
+    console.log('➕ [ListProperty.tsx] Adding custom nearby place:', customNearbyPlace);
     if (customNearbyPlace.type.trim() && customNearbyPlace.name.trim() && customNearbyPlace.distance.trim()) {
-      setCustomNearbyPlaces(prev => [...prev, customNearbyPlace]);
+      setCustomNearbyPlaces(prev => {
+        const updated = [...prev, customNearbyPlace];
+        console.log('  ✅ Updated customNearbyPlaces:', updated);
+        return updated;
+      });
       setCustomNearbyPlace({ type: "", name: "", distance: "" });
+    } else {
+      console.log('  ❌ Skipped - incomplete fields');
     }
   };
 
@@ -326,6 +349,12 @@ export default function ListProperty() {
         imageUrls = uploadData.imageUrls;
       }
 
+      // Log custom fields before creating payload
+      console.log('🔍 [ListProperty.tsx] Custom fields state:');
+      console.log('  customKosherAmenities:', customKosherAmenities);
+      console.log('  customNearbyPlaces:', customNearbyPlaces);
+      console.log('  Filtered checked amenities:', customKosherAmenities.filter(k => k.checked));
+
       // Step 2: Create property
       const propertyPayload = {
         title: formData.title,
@@ -356,9 +385,14 @@ export default function ListProperty() {
         nearby_kosher_shops_distance: formData.nearby_kosher_shops_distance,
         nearby_mikva: formData.nearby_mikva,
         nearby_mikva_distance: formData.nearby_mikva_distance,
-        custom_kosher_amenities: customKosherAmenities.filter(k => k.checked).map(k => k.name),
+        custom_kosher_amenities: customKosherAmenities.filter(k => k.checked),
         custom_nearby_places: customNearbyPlaces,
       };
+      
+      console.log('📦 [ListProperty.tsx] Final payload custom fields:');
+      console.log('  custom_kosher_amenities:', propertyPayload.custom_kosher_amenities);
+      console.log('  custom_nearby_places:', propertyPayload.custom_nearby_places);
+      console.log('📤 [ListProperty.tsx] Full JSON payload being sent:', JSON.stringify(propertyPayload, null, 2));
 
       const response = await fetch(`${API_URL}/api/properties`, {
         method: 'POST',

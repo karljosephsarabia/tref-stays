@@ -146,6 +146,15 @@ export default function Auth() {
   const [customNearbyPlace, setCustomNearbyPlace] = useState({ type: "", name: "", distance: "" });
   const [customNearbyPlaces, setCustomNearbyPlaces] = useState<{ type: string; name: string; distance: string }[]>([]);
 
+  // Debug: Track state changes
+  useEffect(() => {
+    console.log('🔄 [Auth.tsx] State updated - customKosherAmenities:', customKosherAmenities);
+  }, [customKosherAmenities]);
+
+  useEffect(() => {
+    console.log('🔄 [Auth.tsx] State updated - customNearbyPlaces:', customNearbyPlaces);
+  }, [customNearbyPlaces]);
+
   const clearErrors = () => {
     setStepErrors({});
   };
@@ -311,6 +320,13 @@ export default function Auth() {
         imageUrls = uploadData.imageUrls;
       }
       console.log(imageUrls);
+      
+      // Log custom fields before creating payload
+      console.log('🔍 [Auth.tsx] Custom fields state:');
+      console.log('  customKosherAmenities:', customKosherAmenities);
+      console.log('  customNearbyPlaces:', customNearbyPlaces);
+      console.log('  Filtered checked amenities:', customKosherAmenities.filter(k => k.checked));
+      
       // Step 2: Create property
       const propertyPayload = {
         title: propertyData.title,
@@ -341,9 +357,14 @@ export default function Auth() {
         nearby_kosher_shops_distance: propertyData.nearby_kosher_shops_distance,
         nearby_mikva: propertyData.nearby_mikva,
         nearby_mikva_distance: propertyData.nearby_mikva_distance,
-        custom_kosher_amenities: customKosherAmenities.filter(k => k.checked).map(k => k.name),
+        custom_kosher_amenities: customKosherAmenities.filter(k => k.checked),
         custom_nearby_places: customNearbyPlaces,
       };
+      
+      console.log('📦 [Auth.tsx] Final payload custom fields:');
+      console.log('  custom_kosher_amenities:', propertyPayload.custom_kosher_amenities);
+      console.log('  custom_nearby_places:', propertyPayload.custom_nearby_places);
+      console.log('📤 [Auth.tsx] Full JSON payload being sent:', JSON.stringify(propertyPayload, null, 2));
 
       const response = await fetch(`${API_URL}/api/properties`, {
         method: 'POST',
@@ -452,9 +473,16 @@ export default function Auth() {
 
   const addCustomKosherAmenity = () => {
     const trimmed = customKosherAmenity.trim();
+    console.log('➕ [Auth.tsx] Adding custom kosher amenity:', trimmed);
     if (trimmed && !customKosherAmenities.find(a => a.name === trimmed)) {
-      setCustomKosherAmenities(prev => [...prev, { name: trimmed, checked: true }]);
+      setCustomKosherAmenities(prev => {
+        const updated = [...prev, { name: trimmed, checked: true }];
+        console.log('  ✅ Updated customKosherAmenities:', updated);
+        return updated;
+      });
       setCustomKosherAmenity("");
+    } else {
+      console.log('  ❌ Skipped - empty or duplicate');
     }
   };
 
@@ -469,9 +497,16 @@ export default function Auth() {
   };
 
   const addCustomNearbyPlace = () => {
+    console.log('➕ [Auth.tsx] Adding custom nearby place:', customNearbyPlace);
     if (customNearbyPlace.type.trim() && customNearbyPlace.name.trim() && customNearbyPlace.distance.trim()) {
-      setCustomNearbyPlaces(prev => [...prev, customNearbyPlace]);
+      setCustomNearbyPlaces(prev => {
+        const updated = [...prev, customNearbyPlace];
+        console.log('  ✅ Updated customNearbyPlaces:', updated);
+        return updated;
+      });
       setCustomNearbyPlace({ type: "", name: "", distance: "" });
+    } else {
+      console.log('  ❌ Skipped - incomplete fields');
     }
   };
 

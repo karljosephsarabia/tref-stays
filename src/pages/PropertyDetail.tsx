@@ -85,7 +85,9 @@ async function fetchPropertyDetail(propertyId: string | undefined) {
     price: prop.price ?? 0,
     currency: prop.currency || "USD",
     description: prop.additional_information || "",
-    amenities: prop.amenities || [],
+    amenities: typeof prop.amenities === 'string' 
+      ? JSON.parse(prop.amenities) 
+      : (prop.amenities || []),
     kosherKitchen: prop.kosher_kitchen || false,
     shabbosFriendly: prop.shabbos_friendly || false,
     nearbyShul: prop.nearby_shul || "",
@@ -95,6 +97,12 @@ async function fetchPropertyDetail(propertyId: string | undefined) {
     nearbyKosherShops: prop.nearby_kosher_shops || "",
     nearbyKosherShopsDistance: prop.nearby_kosher_shops_distance || "",
     additionalLuxury: prop.additional_luxury || "",
+    customKosherAmenities: typeof prop.custom_kosher_amenities === 'string' 
+      ? JSON.parse(prop.custom_kosher_amenities) 
+      : (prop.custom_kosher_amenities || []),
+    customNearbyPlaces: typeof prop.custom_nearby_places === 'string' 
+      ? JSON.parse(prop.custom_nearby_places) 
+      : (prop.custom_nearby_places || []),
   };
   } catch (error) {
     console.error("Error fetching property:", error);
@@ -155,6 +163,8 @@ const PropertyDetail = () => {
       nearbyKosherShops: "",
       nearbyKosherShopsDistance: "",
       additionalLuxury: "",
+      customKosherAmenities: [] as Array<{ name: string; checked: boolean }>,
+      customNearbyPlaces: [] as Array<{ type: string; name: string; distance: string }>,
     };
   }, [propertyFromDb, id, preferredCurrency.code]);
 
@@ -550,13 +560,13 @@ const PropertyDetail = () => {
               )}
 
               {/* Kosher Features */}
-              {(property.kosherKitchen || property.shabbosFriendly || property.nearbyShul || property.nearbyKosherShops || property.nearbyMikva) && (
+              {(property.kosherKitchen || property.shabbosFriendly || property.nearbyShul || property.nearbyKosherShops || property.nearbyMikva || (property.customKosherAmenities && property.customKosherAmenities.length > 0) || (property.customNearbyPlaces && property.customNearbyPlaces.length > 0)) && (
                 <Card>
                   <CardHeader>
                     <CardTitle>Kosher Features</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {(property.kosherKitchen || property.shabbosFriendly) && (
+                    {(property.kosherKitchen || property.shabbosFriendly || (property.customKosherAmenities && property.customKosherAmenities.length > 0)) && (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         {property.kosherKitchen && (
                           <div className="flex items-center gap-2 text-muted-foreground">
@@ -570,9 +580,15 @@ const PropertyDetail = () => {
                             <span>Shabbos Friendly</span>
                           </div>
                         )}
+                        {property.customKosherAmenities && property.customKosherAmenities.filter(a => a.checked).map((amenity, index) => (
+                          <div key={index} className="flex items-center gap-2 text-muted-foreground">
+                            <Check className="h-5 w-5 text-primary flex-shrink-0" />
+                            <span>{amenity.name}</span>
+                          </div>
+                        ))}
                       </div>
                     )}
-                    {(property.nearbyShul || property.nearbyKosherShops || property.nearbyMikva) && (
+                    {(property.nearbyShul || property.nearbyKosherShops || property.nearbyMikva || (property.customNearbyPlaces && property.customNearbyPlaces.length > 0)) && (
                       <div className="space-y-2">
                         <h4 className="text-sm font-semibold text-foreground">Nearby Facilities</h4>
                         <div className="grid grid-cols-1 gap-2">
@@ -603,6 +619,15 @@ const PropertyDetail = () => {
                               </span>
                             </div>
                           )}
+                          {property.customNearbyPlaces && property.customNearbyPlaces.map((place, index) => (
+                            <div key={index} className="flex items-start gap-2 text-sm text-muted-foreground">
+                              <MapPin className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+                              <span>
+                                <strong>{place.type}:</strong> {place.name}
+                                {place.distance && ` (${place.distance})`}
+                              </span>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     )}

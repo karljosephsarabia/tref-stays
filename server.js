@@ -8,7 +8,6 @@ import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
-import { put } from '@vercel/blob';
 
 const { Pool } = pg;
 
@@ -19,22 +18,20 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
-// Configure multer for image uploads (memory storage for Vercel, disk storage locally)
-const storage = process.env.VERCEL || process.env.VERCEL_ENV
-  ? multer.memoryStorage() // Use memory storage on Vercel
-  : multer.diskStorage({
-      destination: function (req, file, cb) {
-        const uploadDir = path.join(__dirname, 'public', 'uploads');
-        if (!fs.existsSync(uploadDir)) {
-          fs.mkdirSync(uploadDir, { recursive: true });
-        }
-        cb(null, uploadDir);
-      },
-      filename: function (req, file, cb) {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, uniqueSuffix + path.extname(file.originalname));
-      }
-    });
+// Configure multer for image uploads using disk storage for Render
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadDir = path.join(__dirname, 'public', 'uploads');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  }
+});
 
 const upload = multer({
   storage: storage,
@@ -426,36 +423,10 @@ app.post('/api/upload/images', authenticateToken, upload.array('images', 10), as
       return res.status(400).json({ error: 'No files uploaded' });
     }
 
-    // Check if running on Vercel with Blob storage
-    if (process.env.BLOB_READ_WRITE_TOKEN) {
-      console.log('Uploading to Vercel Blob storage...');
-      try {
-        // Upload to Vercel Blob storage
-        const uploadPromises = req.files.map(async (file) => {
-          const filename = `tref-stays/${Date.now()}-${Math.round(Math.random() * 1E9)}${path.extname(file.originalname)}`;
-          console.log('Uploading file:', filename, 'Size:', file.buffer?.length || file.size);
-          
-          const blob = await put(filename, file.buffer, {
-            access: 'public',
-          });
-          console.log('Blob uploaded successfully:', blob.url);
-          return blob.url;
-        });
-
-        const imageUrls = await Promise.all(uploadPromises);
-        console.log('All images uploaded successfully:', imageUrls.length);
-        res.json({ imageUrls });
-      } catch (blobError) {
-        console.error('Vercel Blob upload error:', blobError);
-        console.error('Error details:', JSON.stringify(blobError, null, 2));
-        throw blobError;
-      }
-    } else {
-      // Local development - use disk storage
-      console.log('Using local disk storage...');
-      const imageUrls = req.files.map(file => `/uploads/${file.filename}`);
-      res.json({ imageUrls });
-    }
+    // Use disk storage for Render deployment
+    console.log('Using disk storage...');
+    const imageUrls = req.files.map(file => `/uploads/${file.filename}`);
+    res.json({ imageUrls });
   } catch (error) {
     console.error('Error uploading images:', error);
     console.error('Error name:', error.name);

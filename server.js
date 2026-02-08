@@ -283,7 +283,9 @@ app.get('/api/properties', async (req, res) => {
     // Parse amenities from JSON string to array
     const properties = result.rows.map(property => ({
       ...property,
-      amenities: typeof property.amenities === 'string' ? JSON.parse(property.amenities) : (property.amenities || [])
+      amenities: typeof property.amenities === 'string' ? JSON.parse(property.amenities) : (property.amenities || []),
+      custom_kosher_amenities: typeof property.custom_kosher_amenities === 'string' ? JSON.parse(property.custom_kosher_amenities) : (property.custom_kosher_amenities || []),
+      custom_nearby_places: typeof property.custom_nearby_places === 'string' ? JSON.parse(property.custom_nearby_places) : (property.custom_nearby_places || [])
     }));
     
     console.log(`  ✅ Found ${properties.length} properties`);
@@ -307,7 +309,9 @@ app.get('/api/properties/:id', async (req, res) => {
     // Parse amenities from JSON string to array
     const property = {
       ...result.rows[0],
-      amenities: typeof result.rows[0].amenities === 'string' ? JSON.parse(result.rows[0].amenities) : (result.rows[0].amenities || [])
+      amenities: typeof result.rows[0].amenities === 'string' ? JSON.parse(result.rows[0].amenities) : (result.rows[0].amenities || []),
+      custom_kosher_amenities: typeof result.rows[0].custom_kosher_amenities === 'string' ? JSON.parse(result.rows[0].custom_kosher_amenities) : (result.rows[0].custom_kosher_amenities || []),
+      custom_nearby_places: typeof result.rows[0].custom_nearby_places === 'string' ? JSON.parse(result.rows[0].custom_nearby_places) : (result.rows[0].custom_nearby_places || [])
     };
 
     res.json(property);
@@ -329,7 +333,7 @@ app.post('/api/properties', authenticateToken, async (req, res) => {
       map_lat, map_lng, map_address, additional_luxury, additional_information,
       amenities, kosher_kitchen, shabbos_friendly,
       nearby_shul, nearby_shul_distance, nearby_kosher_shops, nearby_kosher_shops_distance,
-      nearby_mikva, nearby_mikva_distance
+      nearby_mikva, nearby_mikva_distance, custom_kosher_amenities, custom_nearby_places
     } = req.body;
 
     // Use authenticated user's ID as owner_id
@@ -342,8 +346,8 @@ app.post('/api/properties', authenticateToken, async (req, res) => {
         map_lat, map_lng, map_address, additional_luxury, additional_information,
         amenities, kosher_kitchen, shabbos_friendly,
         nearby_shul, nearby_shul_distance, nearby_kosher_shops, nearby_kosher_shops_distance,
-        nearby_mikva, nearby_mikva_distance, active
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, true)
+        nearby_mikva, nearby_mikva_distance, custom_kosher_amenities, custom_nearby_places, active
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, true)
       RETURNING *
     `, [
       owner_id, title, property_type, bedroom_count, bathroom_count, guest_count,
@@ -351,7 +355,9 @@ app.post('/api/properties', authenticateToken, async (req, res) => {
       map_lat, map_lng, map_address, additional_luxury, additional_information,
       amenities ? JSON.stringify(amenities) : '[]', kosher_kitchen || false, shabbos_friendly || false,
       nearby_shul || null, nearby_shul_distance || null, nearby_kosher_shops || null, nearby_kosher_shops_distance || null,
-      nearby_mikva || null, nearby_mikva_distance || null
+      nearby_mikva || null, nearby_mikva_distance || null,
+      custom_kosher_amenities ? JSON.stringify(custom_kosher_amenities) : '[]',
+      custom_nearby_places ? JSON.stringify(custom_nearby_places) : '[]'
     ]);
 
     console.log('Property created successfully:', result.rows[0].id);

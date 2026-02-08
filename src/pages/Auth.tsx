@@ -1492,7 +1492,7 @@ export default function Auth() {
       )}
 
       {/* Kosher Features */}
-      {(propertyData.kosher_kitchen || propertyData.shabbos_friendly || customKosherAmenities.filter(k => k.checked).length > 0 || propertyData.nearby_shul || propertyData.nearby_kosher_shops || propertyData.nearby_mikva) && (
+      {(propertyData.kosher_kitchen || propertyData.shabbos_friendly || customKosherAmenities.filter(k => k.checked).length > 0 || propertyData.nearby_shul || propertyData.nearby_kosher_shops || propertyData.nearby_mikva || customNearbyPlaces.length > 0) && (
         <div>
           <h4 className="font-semibold mb-2">Kosher Features</h4>
           <div className="grid grid-cols-2 gap-2 text-sm">

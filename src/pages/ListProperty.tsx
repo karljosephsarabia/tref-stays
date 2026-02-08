@@ -1076,7 +1076,7 @@ export default function ListProperty() {
         </div>
       )}
 
-      {(formData.kosher_kitchen || formData.shabbos_friendly || customKosherAmenities.filter(k => k.checked).length > 0 || formData.nearby_shul || formData.nearby_kosher_shops || formData.nearby_mikva) && (
+      {(formData.kosher_kitchen || formData.shabbos_friendly || customKosherAmenities.filter(k => k.checked).length > 0 || formData.nearby_shul || formData.nearby_kosher_shops || formData.nearby_mikva || customNearbyPlaces.length > 0) && (
         <div>
           <h4 className="font-semibold mb-2">Kosher Features</h4>
           <div className="grid grid-cols-2 gap-2 text-sm">

@@ -294,77 +294,170 @@ const PropertyDetail = () => {
 
         {/* Image Gallery */}
         <div className="container mx-auto px-4 mb-6 md:mb-8">
-          <div className="relative rounded-lg md:rounded-xl overflow-hidden aspect-[4/3] md:aspect-[16/9] md:max-h-[500px]">
-            <img
-              src={property.images[currentImageIndex]}
-              alt={`${property.title} - Image ${currentImageIndex + 1}`}
-              className="w-full h-full object-cover"
-            />
+          {/* Desktop: Main image with thumbnail grid beside */}
+          <div className="hidden md:flex gap-3">
+            {/* Main Image */}
+            <div className="relative rounded-lg md:rounded-xl overflow-hidden aspect-[4/3] md:aspect-[16/9] md:max-h-[500px] flex-1">
+              <img
+                src={property.images[currentImageIndex]}
+                alt={`${property.title} - Image ${currentImageIndex + 1}`}
+                className="w-full h-full object-cover"
+              />
 
-            {/* Navigation Arrows */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute left-2 md:left-4 top-1/2 -translate-y-1/2 bg-background/80 hover:bg-background rounded-full h-8 w-8 md:h-10 md:w-10"
-              onClick={prevImage}
-            >
-              <ChevronLeft className="h-4 w-4 md:h-5 md:w-5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute right-2 md:right-4 top-1/2 -translate-y-1/2 bg-background/80 hover:bg-background rounded-full h-8 w-8 md:h-10 md:w-10"
-              onClick={nextImage}
-            >
-              <ChevronRight className="h-4 w-4 md:h-5 md:w-5" />
-            </Button>
+              {/* Navigation Arrows */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute left-2 md:left-4 top-1/2 -translate-y-1/2 bg-background/80 hover:bg-background rounded-full h-8 w-8 md:h-10 md:w-10"
+                onClick={prevImage}
+              >
+                <ChevronLeft className="h-4 w-4 md:h-5 md:w-5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute right-2 md:right-4 top-1/2 -translate-y-1/2 bg-background/80 hover:bg-background rounded-full h-8 w-8 md:h-10 md:w-10"
+                onClick={nextImage}
+              >
+                <ChevronRight className="h-4 w-4 md:h-5 md:w-5" />
+              </Button>
 
-            {/* Image Counter */}
-            <div className="absolute bottom-3 md:bottom-4 left-1/2 -translate-x-1/2 bg-background/80 px-2 md:px-3 py-1 rounded-full text-xs md:text-sm">
-              {currentImageIndex + 1} / {property.images.length}
+              {/* Image Counter */}
+              <div className="absolute bottom-3 md:bottom-4 left-1/2 -translate-x-1/2 bg-background/80 px-2 md:px-3 py-1 rounded-full text-xs md:text-sm">
+                {currentImageIndex + 1} / {property.images.length}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="absolute top-3 md:top-4 right-3 md:right-4 flex gap-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="bg-background/80 hover:bg-background rounded-full h-8 w-8 md:h-10 md:w-10"
+                  onClick={() => setIsFavorite(!isFavorite)}
+                >
+                  <Heart
+                    className={`h-4 w-4 md:h-5 md:w-5 ${isFavorite ? "fill-destructive text-destructive" : ""}`}
+                  />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="bg-background/80 hover:bg-background rounded-full h-8 w-8 md:h-10 md:w-10"
+                >
+                  <Share2 className="h-4 w-4 md:h-5 md:w-5" />
+                </Button>
+              </div>
             </div>
 
-            {/* Action Buttons */}
-            <div className="absolute top-3 md:top-4 right-3 md:right-4 flex gap-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="bg-background/80 hover:bg-background rounded-full h-8 w-8 md:h-10 md:w-10"
-                onClick={() => setIsFavorite(!isFavorite)}
-              >
-                <Heart
-                  className={`h-4 w-4 md:h-5 md:w-5 ${isFavorite ? "fill-destructive text-destructive" : ""}`}
-                />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="bg-background/80 hover:bg-background rounded-full h-8 w-8 md:h-10 md:w-10"
-              >
-                <Share2 className="h-4 w-4 md:h-5 md:w-5" />
-              </Button>
+            {/* Thumbnail Grid - 2x2 beside main image on desktop */}
+            <div className="grid grid-cols-2 gap-3 w-[40%] lg:w-[35%]">
+              {property.images.slice(0, 4).map((img, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setCurrentImageIndex(idx)}
+                  className={`relative rounded-lg overflow-hidden border-2 transition-all aspect-square ${
+                    idx === currentImageIndex
+                      ? "border-primary"
+                      : "border-transparent opacity-80 hover:opacity-100"
+                  }`}
+                >
+                  <img
+                    src={img}
+                    alt={`Thumbnail ${idx + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                  {/* Show all photos button on last thumbnail */}
+                  {idx === 3 && property.images.length > 4 && (
+                    <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center text-white hover:bg-black/60 transition-colors">
+                      <div className="flex items-center gap-2">
+                        <div className="grid grid-cols-3 gap-1">
+                          {[...Array(9)].map((_, i) => (
+                            <div key={i} className="w-1 h-1 bg-white rounded-full" />
+                          ))}
+                        </div>
+                        <span className="text-sm font-medium">Show all photos</span>
+                      </div>
+                    </div>
+                  )}
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* Thumbnail Strip */}
-          <div className="flex gap-2 mt-3 md:mt-4 overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 md:px-0">
-            {property.images.map((img, idx) => (
-              <button
-                key={idx}
-                onClick={() => setCurrentImageIndex(idx)}
-                className={`flex-shrink-0 w-16 h-16 md:w-20 md:h-20 rounded-lg overflow-hidden border-2 transition-all ${
-                  idx === currentImageIndex
-                    ? "border-primary"
-                    : "border-transparent opacity-70 hover:opacity-100"
-                }`}
+          {/* Mobile: Main image with thumbnails below */}
+          <div className="md:hidden">
+            <div className="relative rounded-lg overflow-hidden aspect-[4/3]">
+              <img
+                src={property.images[currentImageIndex]}
+                alt={`${property.title} - Image ${currentImageIndex + 1}`}
+                className="w-full h-full object-cover"
+              />
+
+              {/* Navigation Arrows */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute left-2 top-1/2 -translate-y-1/2 bg-background/80 hover:bg-background rounded-full h-8 w-8"
+                onClick={prevImage}
               >
-                <img
-                  src={img}
-                  alt={`Thumbnail ${idx + 1}`}
-                  className="w-full h-full object-cover"
-                />
-              </button>
-            ))}
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute right-2 top-1/2 -translate-y-1/2 bg-background/80 hover:bg-background rounded-full h-8 w-8"
+                onClick={nextImage}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+
+              {/* Image Counter */}
+              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-background/80 px-2 py-1 rounded-full text-xs">
+                {currentImageIndex + 1} / {property.images.length}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="absolute top-3 right-3 flex gap-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="bg-background/80 hover:bg-background rounded-full h-8 w-8"
+                  onClick={() => setIsFavorite(!isFavorite)}
+                >
+                  <Heart
+                    className={`h-4 w-4 ${isFavorite ? "fill-destructive text-destructive" : ""}`}
+                  />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="bg-background/80 hover:bg-background rounded-full h-8 w-8"
+                >
+                  <Share2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Thumbnail Strip - horizontal scroll on mobile */}
+            <div className="flex gap-2 mt-3 overflow-x-auto pb-2 -mx-4 px-4">
+              {property.images.map((img, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setCurrentImageIndex(idx)}
+                  className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-all ${
+                    idx === currentImageIndex
+                      ? "border-primary"
+                      : "border-transparent opacity-70 hover:opacity-100"
+                  }`}
+                >
+                  <img
+                    src={img}
+                    alt={`Thumbnail ${idx + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 

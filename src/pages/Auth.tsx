@@ -341,6 +341,8 @@ export default function Auth() {
         nearby_kosher_shops_distance: propertyData.nearby_kosher_shops_distance,
         nearby_mikva: propertyData.nearby_mikva,
         nearby_mikva_distance: propertyData.nearby_mikva_distance,
+        custom_kosher_amenities: customKosherAmenities.filter(k => k.checked).map(k => k.name),
+        custom_nearby_places: customNearbyPlaces,
       };
 
       const response = await fetch(`${API_URL}/api/properties`, {

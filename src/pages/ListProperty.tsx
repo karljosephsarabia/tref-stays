@@ -356,6 +356,8 @@ export default function ListProperty() {
         nearby_kosher_shops_distance: formData.nearby_kosher_shops_distance,
         nearby_mikva: formData.nearby_mikva,
         nearby_mikva_distance: formData.nearby_mikva_distance,
+        custom_kosher_amenities: customKosherAmenities.filter(k => k.checked).map(k => k.name),
+        custom_nearby_places: customNearbyPlaces,
       };
 
       const response = await fetch(`${API_URL}/api/properties`, {

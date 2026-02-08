@@ -326,6 +326,9 @@ app.post('/api/properties', authenticateToken, async (req, res) => {
   try {
     console.log('Creating property for user:', req.user.id);
     console.log('Property data:', req.body);
+    console.log('🔍 Custom fields received:');
+    console.log('  - custom_kosher_amenities:', req.body.custom_kosher_amenities);
+    console.log('  - custom_nearby_places:', req.body.custom_nearby_places);
     
     const {
       title, property_type, bedroom_count, bathroom_count, guest_count,
@@ -339,6 +342,38 @@ app.post('/api/properties', authenticateToken, async (req, res) => {
     // Use authenticated user's ID as owner_id
     const owner_id = req.user.id;
 
+    console.log('🔧 Preparing to stringify custom fields:');
+    console.log('  - custom_kosher_amenities type:', typeof custom_kosher_amenities);
+    console.log('  - custom_kosher_amenities value:', JSON.stringify(custom_kosher_amenities));
+    console.log('  - custom_nearby_places type:', typeof custom_nearby_places);
+    console.log('  - custom_nearby_places value:', JSON.stringify(custom_nearby_places));
+
+    // Prepare the stringified values
+    const stringifiedCustomKosher = custom_kosher_amenities ? JSON.stringify(custom_kosher_amenities) : '[]';
+    const stringifiedCustomNearby = custom_nearby_places ? JSON.stringify(custom_nearby_places) : '[]';
+    
+    console.log('📝 Stringified values for database:');
+    console.log('  - stringifiedCustomKosher:', stringifiedCustomKosher);
+    console.log('  - stringifiedCustomNearby:', stringifiedCustomNearby);
+
+    const queryParams = [
+      owner_id, title, property_type, bedroom_count, bathroom_count, guest_count,
+      price, currency, street_name, house_number, address, city, state, country, zipcode,
+      map_lat, map_lng, map_address, additional_luxury, additional_information,
+      amenities ? JSON.stringify(amenities) : '[]', kosher_kitchen || false, shabbos_friendly || false,
+      nearby_shul || null, nearby_shul_distance || null, nearby_kosher_shops || null, nearby_kosher_shops_distance || null,
+      nearby_mikva || null, nearby_mikva_distance || null,
+      stringifiedCustomKosher,
+      stringifiedCustomNearby
+    ];
+    
+    console.log('🔢 Query params array length:', queryParams.length);
+    console.log('🔢 Query params positions 28-31:');
+    console.log('  - Position 28 (nearby_mikva_distance):', queryParams[28]);
+    console.log('  - Position 29 (custom_kosher_amenities):', queryParams[29]);
+    console.log('  - Position 30 (custom_nearby_places):', queryParams[30]);
+    console.log('🔢 Full queryParams:', JSON.stringify(queryParams, null, 2));
+
     const result = await pool.query(`
       INSERT INTO rs_properties (
         owner_id, title, property_type, bedroom_count, bathroom_count, guest_count,
@@ -349,18 +384,11 @@ app.post('/api/properties', authenticateToken, async (req, res) => {
         nearby_mikva, nearby_mikva_distance, custom_kosher_amenities, custom_nearby_places, active
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, true)
       RETURNING *
-    `, [
-      owner_id, title, property_type, bedroom_count, bathroom_count, guest_count,
-      price, currency, street_name, house_number, address, city, state, country, zipcode,
-      map_lat, map_lng, map_address, additional_luxury, additional_information,
-      amenities ? JSON.stringify(amenities) : '[]', kosher_kitchen || false, shabbos_friendly || false,
-      nearby_shul || null, nearby_shul_distance || null, nearby_kosher_shops || null, nearby_kosher_shops_distance || null,
-      nearby_mikva || null, nearby_mikva_distance || null,
-      custom_kosher_amenities ? JSON.stringify(custom_kosher_amenities) : '[]',
-      custom_nearby_places ? JSON.stringify(custom_nearby_places) : '[]'
-    ]);
+    `, queryParams);
 
-    console.log('Property created successfully:', result.rows[0].id);
+    console.log('✅ Property created successfully, ID:', result.rows[0].id);
+    console.log('📊 Returned from DB - custom_kosher_amenities:', result.rows[0].custom_kosher_amenities);
+    console.log('📊 Returned from DB - custom_nearby_places:', result.rows[0].custom_nearby_places);
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('Error creating property:', error);

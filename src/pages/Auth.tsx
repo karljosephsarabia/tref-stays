@@ -143,6 +143,8 @@ export default function Auth() {
   const [customAmenities, setCustomAmenities] = useState<string[]>([]);
   const [customKosherAmenity, setCustomKosherAmenity] = useState("");
   const [customKosherAmenities, setCustomKosherAmenities] = useState<{ name: string; checked: boolean }[]>([]);
+  const [customNearbyPlace, setCustomNearbyPlace] = useState({ type: "", name: "", distance: "" });
+  const [customNearbyPlaces, setCustomNearbyPlaces] = useState<{ type: string; name: string; distance: string }[]>([]);
 
   const clearErrors = () => {
     setStepErrors({});
@@ -461,6 +463,23 @@ export default function Auth() {
   const toggleCustomKosherAmenity = (name: string) => {
     setCustomKosherAmenities(prev => 
       prev.map(a => a.name === name ? { ...a, checked: !a.checked } : a)
+    );
+  };
+
+  const addCustomNearbyPlace = () => {
+    if (customNearbyPlace.type.trim() && customNearbyPlace.name.trim() && customNearbyPlace.distance.trim()) {
+      setCustomNearbyPlaces(prev => [...prev, customNearbyPlace]);
+      setCustomNearbyPlace({ type: "", name: "", distance: "" });
+    }
+  };
+
+  const removeCustomNearbyPlace = (index: number) => {
+    setCustomNearbyPlaces(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const updateCustomNearbyPlace = (index: number, field: 'type' | 'name' | 'distance', value: string) => {
+    setCustomNearbyPlaces(prev => 
+      prev.map((place, i) => i === index ? { ...place, [field]: value } : place)
     );
   };
 
@@ -1303,6 +1322,89 @@ export default function Auth() {
           </div>
         </div>
       </div>
+
+      {/* Custom Nearby Places */}
+      {customNearbyPlaces.map((place, index) => (
+        <div key={index} className="space-y-4 pt-4">
+          <div className="flex items-center justify-between">
+            <h4 className="font-medium">Nearby {place.type}</h4>
+            <button
+              type="button"
+              onClick={() => removeCustomNearbyPlace(index)}
+              className="p-1.5 rounded hover:bg-destructive/10 transition-colors"
+              title="Remove"
+            >
+              <X className="h-4 w-4 text-destructive" />
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor={`customNearby${index}Name`}>{place.type} Name</Label>
+              <Input
+                id={`customNearby${index}Name`}
+                value={place.name}
+                onChange={(e) => updateCustomNearbyPlace(index, 'name', e.target.value)}
+                placeholder={`${place.type} name`}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor={`customNearby${index}Distance`}>Distance</Label>
+              <Input
+                id={`customNearby${index}Distance`}
+                value={place.distance}
+                onChange={(e) => updateCustomNearbyPlace(index, 'distance', e.target.value)}
+                placeholder="10 min walk"
+              />
+            </div>
+          </div>
+        </div>
+      ))}
+
+      {/* Add Custom Nearby Place Input */}
+      <div className="space-y-4 pt-4 border-t border-border">
+        <h4 className="font-medium">Add Custom Nearby Place</h4>
+        <div className="space-y-3">
+          <div className="space-y-2">
+            <Label htmlFor="customNearbyType">Type (e.g., Park, School, Beach)</Label>
+            <Input
+              id="customNearbyType"
+              value={customNearbyPlace.type}
+              onChange={(e) => setCustomNearbyPlace(prev => ({ ...prev, type: e.target.value }))}
+              placeholder="Nearby Park"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="customNearbyName">Name</Label>
+              <Input
+                id="customNearbyName"
+                value={customNearbyPlace.name}
+                onChange={(e) => setCustomNearbyPlace(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="Central Park"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="customNearbyDistance">Distance</Label>
+              <Input
+                id="customNearbyDistance"
+                value={customNearbyPlace.distance}
+                onChange={(e) => setCustomNearbyPlace(prev => ({ ...prev, distance: e.target.value }))}
+                placeholder="10 min walk"
+              />
+            </div>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={addCustomNearbyPlace}
+            disabled={!customNearbyPlace.type.trim() || !customNearbyPlace.name.trim() || !customNearbyPlace.distance.trim()}
+            className="w-full"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Nearby Place
+          </Button>
+        </div>
+      </div>
     </div>
   );
 
@@ -1430,6 +1532,12 @@ export default function Auth() {
                 <span>Mikva: {propertyData.nearby_mikva} ({propertyData.nearby_mikva_distance})</span>
               </div>
             )}
+            {customNearbyPlaces.map((place, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-muted-foreground" />
+                <span>{place.type}: {place.name} ({place.distance})</span>
+              </div>
+            ))}
           </div>
         </div>
       )}

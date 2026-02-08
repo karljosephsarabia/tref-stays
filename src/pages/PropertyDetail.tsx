@@ -137,7 +137,7 @@ const PropertyDetail = () => {
       baths: 0,
       images: [PLACEHOLDER_IMAGE],
       price: 0,
-      currency: "USD",
+      currency: preferredCurrency.code,
       description: "",
       amenities: [] as string[],
       kosherKitchen: false,
@@ -147,8 +147,10 @@ const PropertyDetail = () => {
       nearbyMikva: "",
       nearbyMikvaDistance: "",
       nearbyKosherShops: "",
-      nearbyKosherShopsDistance: "",      additionalLuxury: "",    };
-  }, [propertyFromDb, id]);
+      nearbyKosherShopsDistance: "",
+      additionalLuxury: "",
+    };
+  }, [propertyFromDb, id, preferredCurrency.code]);
 
   const nextImage = () => {
     setCurrentImageIndex((prev) =>

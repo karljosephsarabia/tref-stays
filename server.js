@@ -626,6 +626,48 @@ app.get('/api/reservations/test', async (req, res) => {
   }
 });
 
+// Debug endpoint to check custom fields columns and test INSERT
+app.get('/api/debug/custom-fields', async (req, res) => {
+  try {
+    // Check column info for custom fields
+    const columnInfo = await pool.query(`
+      SELECT column_name, data_type, column_default, is_nullable
+      FROM information_schema.columns 
+      WHERE table_name = 'rs_properties' 
+      AND column_name IN ('custom_kosher_amenities', 'custom_nearby_places')
+      ORDER BY ordinal_position
+    `);
+    
+    // Get a recent property to see what's stored
+    const recentProperty = await pool.query(`
+      SELECT id, title, custom_kosher_amenities, custom_nearby_places 
+      FROM rs_properties 
+      ORDER BY id DESC LIMIT 3
+    `);
+    
+    // Test a direct UPDATE on an existing property
+    const testValue = JSON.stringify([{name: 'Debug Test', checked: true}]);
+    const testUpdate = await pool.query(`
+      UPDATE rs_properties 
+      SET custom_kosher_amenities = $1 
+      WHERE id = (SELECT MAX(id) FROM rs_properties)
+      RETURNING id, custom_kosher_amenities
+    `, [testValue]);
+    
+    res.json({
+      columnInfo: columnInfo.rows,
+      recentProperties: recentProperty.rows,
+      testUpdate: testUpdate.rows[0],
+      testValueUsed: testValue
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      error: error.message,
+      stack: error.stack
+    });
+  }
+});
+
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

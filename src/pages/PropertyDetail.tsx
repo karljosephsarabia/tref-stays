@@ -32,7 +32,7 @@ import {
   CalendarIcon,
   Loader2,
 } from "lucide-react";
-import { useCurrency } from "@/contexts/CurrencyContext";
+import { useCurrency, CURRENCIES } from "@/contexts/CurrencyContext";
 import { format, differenceInDays } from "date-fns";
 import { DateRange } from "react-day-picker";
 import { supabase } from "@/integrations/supabase/client";
@@ -107,6 +107,12 @@ const PropertyDetail = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { formatPrice, preferredCurrency } = useCurrency();
+  
+  // Helper function to format price in property's original currency
+  const formatPropertyPrice = (price: number, currencyCode: string) => {
+    const currency = CURRENCIES.find(c => c.code === currencyCode) || CURRENCIES[0];
+    return `${currency.symbol}${price.toLocaleString()}`;
+  };
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [guestCount, setGuestCount] = useState(1);
@@ -380,7 +386,7 @@ const PropertyDetail = () => {
                     </p>
                   </div>
                   <Badge className="bg-primary text-primary-foreground text-base md:text-lg px-3 md:px-4 py-1.5 md:py-2 self-start">
-                    {formatPrice(property.price, property.currency)}/night
+                    {formatPropertyPrice(property.price, property.currency)}/night
                   </Badge>
                 </div>
 
@@ -519,7 +525,7 @@ const PropertyDetail = () => {
                   <CardTitle className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <span className="text-base md:text-lg">Book this property</span>
                     <span className="text-primary text-lg md:text-xl">
-                      {formatPrice(property.price, property.currency)}
+                      {formatPropertyPrice(property.price, property.currency)}
                       <span className="text-sm text-muted-foreground font-normal">
                         /night
                       </span>
@@ -608,23 +614,23 @@ const PropertyDetail = () => {
                     <div className="pt-4 border-t space-y-2">
                       <div className="flex justify-between text-muted-foreground">
                         <span>
-                          {formatPrice(property.price, property.currency)} ×{" "}
+                          {formatPropertyPrice(property.price, property.currency)} ×{" "}
                           {nights} nights
                         </span>
                         <span>
-                          {formatPrice(subtotal, property.currency)}
+                          {formatPropertyPrice(subtotal, property.currency)}
                         </span>
                       </div>
                       <div className="flex justify-between text-muted-foreground">
                         <span>Service fee</span>
                         <span>
-                          {formatPrice(serviceFee, property.currency)}
+                          {formatPropertyPrice(serviceFee, property.currency)}
                         </span>
                       </div>
                       <div className="flex justify-between font-semibold text-lg pt-2 border-t">
                         <span>Total ({property.currency})</span>
                         <span className="text-primary">
-                          {formatPrice(total, property.currency)}
+                          {formatPropertyPrice(total, property.currency)}
                         </span>
                       </div>
                     </div>
@@ -664,7 +670,7 @@ const PropertyDetail = () => {
                         Processing...
                       </>
                     ) : dateRange?.from && dateRange?.to ? (
-                      `Reserve for ${formatPrice(total, property.currency)}`
+                      `Reserve for ${formatPropertyPrice(total, property.currency)}`
                     ) : (
                       "Select dates to book"
                     )}

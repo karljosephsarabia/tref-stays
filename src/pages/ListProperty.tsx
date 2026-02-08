@@ -129,6 +129,8 @@ export default function ListProperty() {
   const [mainImageIndex, setMainImageIndex] = useState(0);
   const [customAmenity, setCustomAmenity] = useState("");
   const [customAmenities, setCustomAmenities] = useState<string[]>([]);
+  const [customKosherAmenity, setCustomKosherAmenity] = useState("");
+  const [customKosherAmenities, setCustomKosherAmenities] = useState<{ name: string; checked: boolean }[]>([]);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -166,6 +168,24 @@ export default function ListProperty() {
   const removeCustomAmenity = (amenity: string) => {
     setCustomAmenities(prev => prev.filter(a => a !== amenity));
     updateField("amenities", formData.amenities.filter(a => a !== amenity));
+  };
+
+  const addCustomKosherAmenity = () => {
+    const trimmed = customKosherAmenity.trim();
+    if (trimmed && !customKosherAmenities.find(a => a.name === trimmed)) {
+      setCustomKosherAmenities(prev => [...prev, { name: trimmed, checked: true }]);
+      setCustomKosherAmenity("");
+    }
+  };
+
+  const removeCustomKosherAmenity = (name: string) => {
+    setCustomKosherAmenities(prev => prev.filter(a => a.name !== name));
+  };
+
+  const toggleCustomKosherAmenity = (name: string) => {
+    setCustomKosherAmenities(prev => 
+      prev.map(a => a.name === name ? { ...a, checked: !a.checked } : a)
+    );
   };
 
   const clearErrors = () => {
@@ -756,6 +776,52 @@ export default function ListProperty() {
         </Label>
       </div>
 
+      {/* Custom Kosher Amenities */}
+      {customKosherAmenities.map((amenity) => (
+        <div key={amenity.name} className="flex items-center space-x-2 p-3 bg-primary/5 rounded-lg group">
+          <Checkbox
+            id={`custom-kosher-${amenity.name}`}
+            checked={amenity.checked}
+            onCheckedChange={() => toggleCustomKosherAmenity(amenity.name)}
+          />
+          <Label htmlFor={`custom-kosher-${amenity.name}`} className="cursor-pointer flex-1">
+            {amenity.name}
+          </Label>
+          <button
+            type="button"
+            onClick={() => removeCustomKosherAmenity(amenity.name)}
+            className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-destructive/10"
+          >
+            <X className="h-4 w-4 text-destructive" />
+          </button>
+        </div>
+      ))}
+
+      {/* Add Custom Kosher Amenity Input */}
+      <div className="flex gap-2">
+        <Input
+          value={customKosherAmenity}
+          onChange={(e) => setCustomKosherAmenity(e.target.value)}
+          placeholder="Add custom kosher amenity..."
+          className="flex-1"
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              addCustomKosherAmenity();
+            }
+          }}
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          onClick={addCustomKosherAmenity}
+          disabled={!customKosherAmenity.trim()}
+        >
+          <Plus className="h-4 w-4" />
+        </Button>
+      </div>
+
       <div className="space-y-4 pt-4">
         <h4 className="font-medium">Nearby Shul</h4>
         <div className="grid grid-cols-2 gap-3">
@@ -908,7 +974,7 @@ export default function ListProperty() {
         </div>
       )}
 
-      {(formData.kosher_kitchen || formData.shabbos_friendly || formData.nearby_shul || formData.nearby_kosher_shops || formData.nearby_mikva) && (
+      {(formData.kosher_kitchen || formData.shabbos_friendly || customKosherAmenities.filter(k => k.checked).length > 0 || formData.nearby_shul || formData.nearby_kosher_shops || formData.nearby_mikva) && (
         <div>
           <h4 className="font-semibold mb-2">Kosher Features</h4>
           <div className="grid grid-cols-2 gap-2 text-sm">
@@ -924,6 +990,12 @@ export default function ListProperty() {
                 <span>Shabbos Friendly</span>
               </div>
             )}
+            {customKosherAmenities.filter(k => k.checked).map((kosher, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <Check className="h-4 w-4 text-green-600" />
+                <span>{kosher.name}</span>
+              </div>
+            ))}
             {formData.nearby_shul && (
               <div className="flex items-center gap-2">
                 <MapPin className="h-4 w-4 text-muted-foreground" />

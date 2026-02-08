@@ -620,7 +620,7 @@ const PropertyDetail = () => {
                         </span>
                       </div>
                       <div className="flex justify-between font-semibold text-lg pt-2 border-t">
-                        <span>Total ({preferredCurrency.code})</span>
+                        <span>Total ({property.currency})</span>
                         <span className="text-primary">
                           {formatPrice(total, property.currency)}
                         </span>

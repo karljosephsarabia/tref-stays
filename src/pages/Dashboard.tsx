@@ -37,11 +37,18 @@ interface PropertyWithImage {
   id: string;
   title: string;
   property_type: string;
-  city: string;
-  state: string;
-  price_per_night: number;
-  bedrooms: number;
-  bathrooms: number;
+  street_name?: string;
+  house_number?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  map_address?: string;
+  zipcode?: string;
+  price: number;
+  currency?: string;
+  bedroom_count: number;
+  bathroom_count: number;
   status: string;
   main_image?: string;
 }
@@ -158,7 +165,7 @@ export default function Dashboard() {
   };
 
   const locationStr = (p: PropertyWithImage) =>
-    [p.city, p.state].filter(Boolean).join(", ") || "—";
+    p.map_address || p.street_name || "-";
 
   if (authLoading) {
     return (
@@ -310,15 +317,15 @@ export default function Dashboard() {
                     <div className="flex items-center gap-3 text-sm text-muted-foreground">
                       <span className="flex items-center gap-1">
                         <BedDouble className="h-4 w-4" />
-                        {property.bedrooms ?? 0}
+                        {property.bedroom_count ?? 0}
                       </span>
                       <span className="flex items-center gap-1">
                         <Bath className="h-4 w-4" />
-                        {property.bathrooms ?? 0}
+                        {property.bathroom_count ?? 0}
                       </span>
-                      {property.price_per_night != null && (
+                      {property.price != null && (
                         <span className="font-medium text-foreground">
-                          ${Number(property.price_per_night)}/night
+                          {property.currency === 'USD' ? '$' : property.currency === 'CAD' ? 'C$' : property.currency === 'GBP' ? '£' : property.currency === 'EUR' ? '€' : property.currency === 'ILS' ? '₪' : '$'}{Number(property.price)}/night
                         </span>
                       )}
                     </div>

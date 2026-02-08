@@ -47,28 +47,29 @@ const AMENITIES_OPTIONS = [
   "Elevator", "Wheelchair Accessible", "Smoke Detector", "First Aid Kit"
 ];
 
-const getCurrencyByCountry = (countryCode: string) => {
-  const country = COUNTRIES.find(c => c.code === countryCode);
-  return country || COUNTRIES[0];
-};
-
 interface FormData {
   // Basic Info
   title: string;
   property_type: string;
-  bedrooms: number;
-  bathrooms: number;
-  max_guests: number;
-  price_per_night: string;
+  bedroom_count: number;
+  bathroom_count: number;
+  guest_count: number;
+  price: string;
   currency: string;
   // Location
+  street_name: string;
+  house_number: string;
   address: string;
   city: string;
   state: string;
   country: string;
   zipcode: string;
-  // Description & Amenities
-  description: string;
+  map_lat: string;
+  map_lng: string;
+  map_address: string;
+  // Description
+  additional_information: string;
+  additional_luxury: string;
   amenities: string[];
   // Kosher amenities
   nearby_shul: string;
@@ -84,17 +85,23 @@ interface FormData {
 const initialFormData: FormData = {
   title: "",
   property_type: "",
-  bedrooms: 1,
-  bathrooms: 1,
-  max_guests: 2,
-  price_per_night: "",
+  bedroom_count: 1,
+  bathroom_count: 1,
+  guest_count: 2,
+  price: "",
   currency: "USD",
+  street_name: "",
+  house_number: "",
   address: "",
   city: "",
   state: "",
   country: "",
   zipcode: "",
-  description: "",
+  map_lat: "",
+  map_lng: "",
+  map_address: "",
+  additional_information: "",
+  additional_luxury: "",
   amenities: [],
   nearby_shul: "",
   nearby_shul_distance: "",
@@ -114,7 +121,7 @@ export default function ListProperty() {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(false);
-  const [step, setStep] = useState(1); // Steps: 1=Property Basics, 2=Location, 3=Photos, 4=Description, 5=Kosher Amenities, 6=Preview
+  const [step, setStep] = useState(1); // Steps: 1=Property Basics, 2=Location, 3=Photos, 4=Description, 5=Preview
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [errors, setErrors] = useState<FormErrors>({});
   const [uploadedImages, setUploadedImages] = useState<File[]>([]);
@@ -138,6 +145,29 @@ export default function ListProperty() {
     { title: "Preview", description: "Review your listing" },
   ];
 
+  const toggleAmenity = (amenity: string) => {
+    const current = formData.amenities;
+    if (current.includes(amenity)) {
+      updateField("amenities", current.filter(a => a !== amenity));
+    } else {
+      updateField("amenities", [...current, amenity]);
+    }
+  };
+
+  const addCustomAmenity = () => {
+    const trimmed = customAmenity.trim();
+    if (trimmed && !AMENITIES_OPTIONS.includes(trimmed) && !customAmenities.includes(trimmed)) {
+      setCustomAmenities(prev => [...prev, trimmed]);
+      updateField("amenities", [...formData.amenities, trimmed]);
+      setCustomAmenity("");
+    }
+  };
+
+  const removeCustomAmenity = (amenity: string) => {
+    setCustomAmenities(prev => prev.filter(a => a !== amenity));
+    updateField("amenities", formData.amenities.filter(a => a !== amenity));
+  };
+
   const clearErrors = () => {
     setErrors({});
   };
@@ -160,8 +190,8 @@ export default function ListProperty() {
       case 1: // Property Basics
         if (!formData.title.trim()) newErrors.title = "Property title is required";
         if (!formData.property_type) newErrors.property_type = "Property type is required";
-        if (!formData.price_per_night) newErrors.price_per_night = "Price per night is required";
-        else if (parseFloat(formData.price_per_night) <= 0) newErrors.price_per_night = "Price must be greater than 0";
+        if (!formData.price) newErrors.price = "Price per night is required";
+        else if (parseFloat(formData.price) <= 0) newErrors.price = "Price must be greater than 0";
         break;
       case 2: // Location
         if (!formData.address.trim()) newErrors.address = "Street address is required";
@@ -172,11 +202,8 @@ export default function ListProperty() {
         if (uploadedImages.length === 0) newErrors.images = "Please upload at least one property image";
         break;
       case 4: // Description
-        if (!formData.description.trim()) newErrors.description = "Property description is required";
-        else if (formData.description.length < 20) newErrors.description = "Description must be at least 20 characters";
-        break;
-      case 5: // Kosher Amenities
-        // Optional step, no required fields
+        if (!formData.additional_information.trim()) newErrors.additional_information = "Property description is required";
+        else if (formData.additional_information.length < 20) newErrors.additional_information = "Description must be at least 20 characters";
         break;
     }
     
@@ -228,29 +255,6 @@ export default function ListProperty() {
     setMainImageIndex(index);
   };
 
-  const toggleAmenity = (amenity: string) => {
-    const current = formData.amenities;
-    if (current.includes(amenity)) {
-      updateField("amenities", current.filter(a => a !== amenity));
-    } else {
-      updateField("amenities", [...current, amenity]);
-    }
-  };
-
-  const addCustomAmenity = () => {
-    const trimmed = customAmenity.trim();
-    if (trimmed && !AMENITIES_OPTIONS.includes(trimmed) && !customAmenities.includes(trimmed)) {
-      setCustomAmenities(prev => [...prev, trimmed]);
-      updateField("amenities", [...formData.amenities, trimmed]);
-      setCustomAmenity("");
-    }
-  };
-
-  const removeCustomAmenity = (amenity: string) => {
-    setCustomAmenities(prev => prev.filter(a => a !== amenity));
-    updateField("amenities", formData.amenities.filter(a => a !== amenity));
-  };
-
   const handleSubmit = async () => {
     if (!user || !validateStep()) return;
 
@@ -286,18 +290,24 @@ export default function ListProperty() {
       // Step 2: Create property
       const propertyPayload = {
         title: formData.title,
-        description: formData.description,
         property_type: formData.property_type,
-        bedrooms: formData.bedrooms,
-        bathrooms: formData.bathrooms,
-        max_guests: formData.max_guests,
-        price_per_night: parseFloat(formData.price_per_night),
+        bedroom_count: formData.bedroom_count,
+        bathroom_count: formData.bathroom_count,
+        guest_count: formData.guest_count,
+        price: parseFloat(formData.price),
         currency: formData.currency,
+        street_name: formData.street_name,
+        house_number: formData.house_number,
         address: formData.address,
         city: formData.city,
         state: formData.state,
         country: formData.country,
         zipcode: formData.zipcode,
+        map_lat: formData.map_lat || null,
+        map_lng: formData.map_lng || null,
+        map_address: formData.map_address || null,
+        additional_luxury: formData.additional_luxury || null,
+        additional_information: formData.additional_information,
         amenities: formData.amenities,
         kosher_kitchen: formData.kosher_kitchen,
         shabbos_friendly: formData.shabbos_friendly,
@@ -422,8 +432,8 @@ export default function ListProperty() {
             id="bedrooms"
             type="number"
             min="1"
-            value={formData.bedrooms}
-            onChange={(e) => updateField("bedrooms", parseInt(e.target.value) || 1)}
+            value={formData.bedroom_count}
+            onChange={(e) => updateField("bedroom_count", parseInt(e.target.value) || 1)}
           />
         </div>
         <div className="space-y-2">
@@ -432,8 +442,8 @@ export default function ListProperty() {
             id="bathrooms"
             type="number"
             min="1"
-            value={formData.bathrooms}
-            onChange={(e) => updateField("bathrooms", parseInt(e.target.value) || 1)}
+            value={formData.bathroom_count}
+            onChange={(e) => updateField("bathroom_count", parseInt(e.target.value) || 1)}
           />
         </div>
         <div className="space-y-2">
@@ -442,8 +452,8 @@ export default function ListProperty() {
             id="maxGuests"
             type="number"
             min="1"
-            value={formData.max_guests}
-            onChange={(e) => updateField("max_guests", parseInt(e.target.value) || 1)}
+            value={formData.guest_count}
+            onChange={(e) => updateField("guest_count", parseInt(e.target.value) || 1)}
           />
         </div>
       </div>
@@ -466,7 +476,7 @@ export default function ListProperty() {
         </Select>
       </div>
       <div className="space-y-2">
-        <Label htmlFor="price">Price per Night ({getCurrencyByCountry(formData.country || "us").symbol})</Label>
+        <Label htmlFor="price">Price per Night ({COUNTRIES.find(c => c.currency === formData.currency)?.symbol || "$"})</Label>
         <div className="relative">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
             {COUNTRIES.find(c => c.currency === formData.currency)?.symbol || "$"}
@@ -475,13 +485,13 @@ export default function ListProperty() {
             id="price"
             type="number"
             min="0"
-            value={formData.price_per_night}
-            onChange={(e) => updateField("price_per_night", e.target.value)}
+            value={formData.price}
+            onChange={(e) => updateField("price", e.target.value)}
             placeholder="150"
-            className={`pl-10 ${errors.price_per_night ? "border-destructive" : ""}`}
+            className={`pl-10 ${errors.price ? "border-destructive" : ""}`}
           />
         </div>
-        <ErrorMessage field="price_per_night" />
+        <ErrorMessage field="price" />
       </div>
     </div>
   );
@@ -639,14 +649,25 @@ export default function ListProperty() {
         <Label htmlFor="description">Property Description</Label>
         <Textarea
           id="description"
-          value={formData.description}
-          onChange={(e) => updateField("description", e.target.value)}
+          value={formData.additional_information}
+          onChange={(e) => updateField("additional_information", e.target.value)}
           placeholder="Describe your property in detail. Mention special features, nearby attractions, and what makes it unique..."
-          className={`min-h-[120px] ${errors.description ? "border-destructive" : ""}`}
+          className={`min-h-[120px] ${errors.additional_information ? "border-destructive" : ""}`}
         />
-        <ErrorMessage field="description" />
+        <ErrorMessage field="additional_information" />
       </div>
       
+      {/* <div className="space-y-2">
+        <Label htmlFor="luxury">Luxury Features (Optional)</Label>
+        <Textarea
+          id="luxury"
+          value={formData.additional_luxury}
+          onChange={(e) => updateField("additional_luxury", e.target.value)}
+          placeholder="List any luxury amenities or special features (e.g., pool, hot tub, chef's kitchen, etc.)"
+          className="min-h-[80px]"
+        />
+      </div> */}
+
       <div className="space-y-2">
         <Label>Amenities</Label>
         <div className="grid grid-cols-2 gap-2">
@@ -836,12 +857,12 @@ export default function ListProperty() {
           <h2 className="text-xl font-bold">{formData.title || "Your Property Title"}</h2>
           <p className="text-muted-foreground flex items-center gap-1">
             <MapPin className="h-4 w-4" />
-            {[formData.city, formData.state, getCountryName(formData.country)].filter(Boolean).join(", ") || "Location"}
+            {[formData.city, formData.state, COUNTRIES.find(c => c.code === formData.country)?.name].filter(Boolean).join(", ") || formData.address || "Location"}
           </p>
         </div>
         <div className="text-right">
           <p className="text-2xl font-bold text-primary">
-            {getCurrencySymbol()}{formData.price_per_night || "0"}
+            {COUNTRIES.find(c => c.currency === formData.currency)?.symbol || "$"}{formData.price || "0"}
           </p>
           <p className="text-sm text-muted-foreground">per night ({formData.currency})</p>
         </div>
@@ -850,22 +871,29 @@ export default function ListProperty() {
       <div className="flex gap-4 p-4 bg-muted/50 rounded-lg">
         <div className="flex items-center gap-2">
           <Bed className="h-5 w-5 text-muted-foreground" />
-          <span>{formData.bedrooms} bed{formData.bedrooms > 1 ? "s" : ""}</span>
+          <span>{formData.bedroom_count} bed{formData.bedroom_count > 1 ? "s" : ""}</span>
         </div>
         <div className="flex items-center gap-2">
           <Bath className="h-5 w-5 text-muted-foreground" />
-          <span>{formData.bathrooms} bath{formData.bathrooms > 1 ? "s" : ""}</span>
+          <span>{formData.bathroom_count} bath{formData.bathroom_count > 1 ? "s" : ""}</span>
         </div>
         <div className="flex items-center gap-2">
           <Users className="h-5 w-5 text-muted-foreground" />
-          <span>{formData.max_guests} guest{formData.max_guests > 1 ? "s" : ""}</span>
+          <span>{formData.guest_count} guest{formData.guest_count > 1 ? "s" : ""}</span>
         </div>
       </div>
 
       <div>
         <h4 className="font-semibold mb-2">About this property</h4>
-        <p className="text-muted-foreground">{formData.description || "No description provided"}</p>
+        <p className="text-muted-foreground">{formData.additional_information || "No description provided"}</p>
       </div>
+
+      {formData.additional_luxury && (
+        <div>
+          <h4 className="font-semibold mb-2">Luxury Features</h4>
+          <p className="text-muted-foreground">{formData.additional_luxury}</p>
+        </div>
+      )}
 
       {formData.amenities.length > 0 && (
         <div>
@@ -880,41 +908,43 @@ export default function ListProperty() {
         </div>
       )}
 
-      <div>
-        <h4 className="font-semibold mb-2">Kosher Features</h4>
-        <div className="grid grid-cols-2 gap-2 text-sm">
-          {formData.kosher_kitchen && (
-            <div className="flex items-center gap-2">
-              <Check className="h-4 w-4 text-green-600" />
-              <span>Kosher Kitchen</span>
-            </div>
-          )}
-          {formData.shabbos_friendly && (
-            <div className="flex items-center gap-2">
-              <Check className="h-4 w-4 text-green-600" />
-              <span>Shabbos Friendly</span>
-            </div>
-          )}
-          {formData.nearby_shul && (
-            <div className="flex items-center gap-2">
-              <MapPin className="h-4 w-4 text-muted-foreground" />
-              <span>Shul: {formData.nearby_shul} ({formData.nearby_shul_distance})</span>
-            </div>
-          )}
-          {formData.nearby_kosher_shops && (
-            <div className="flex items-center gap-2">
-              <MapPin className="h-4 w-4 text-muted-foreground" />
-              <span>Kosher Shop: {formData.nearby_kosher_shops} ({formData.nearby_kosher_shops_distance})</span>
-            </div>
-          )}
-          {formData.nearby_mikva && (
-            <div className="flex items-center gap-2">
-              <MapPin className="h-4 w-4 text-muted-foreground" />
-              <span>Mikva: {formData.nearby_mikva} ({formData.nearby_mikva_distance})</span>
-            </div>
-          )}
+      {(formData.kosher_kitchen || formData.shabbos_friendly || formData.nearby_shul || formData.nearby_kosher_shops || formData.nearby_mikva) && (
+        <div>
+          <h4 className="font-semibold mb-2">Kosher Features</h4>
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            {formData.kosher_kitchen && (
+              <div className="flex items-center gap-2">
+                <Check className="h-4 w-4 text-green-600" />
+                <span>Kosher Kitchen</span>
+              </div>
+            )}
+            {formData.shabbos_friendly && (
+              <div className="flex items-center gap-2">
+                <Check className="h-4 w-4 text-green-600" />
+                <span>Shabbos Friendly</span>
+              </div>
+            )}
+            {formData.nearby_shul && (
+              <div className="flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-muted-foreground" />
+                <span>Shul: {formData.nearby_shul} ({formData.nearby_shul_distance})</span>
+              </div>
+            )}
+            {formData.nearby_kosher_shops && (
+              <div className="flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-muted-foreground" />
+                <span>Kosher Shop: {formData.nearby_kosher_shops} ({formData.nearby_kosher_shops_distance})</span>
+              </div>
+            )}
+            {formData.nearby_mikva && (
+              <div className="flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-muted-foreground" />
+                <span>Mikva: {formData.nearby_mikva} ({formData.nearby_mikva_distance})</span>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {imagePreviewUrls.length > 1 && (
         <div>

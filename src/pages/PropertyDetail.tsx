@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/contexts/AuthContext";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -9,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
 import {
   Popover,
   PopoverContent,
@@ -70,28 +72,29 @@ async function fetchPropertyDetail(propertyId: string | undefined) {
     return {
     id: prop.id,
     title: prop.title,
-    location: [prop.city, prop.state, prop.country].filter(Boolean).join(", ") || prop.address || "",
+    location: prop.map_address || [prop.city, prop.state, prop.country].filter(Boolean).join(", ") || prop.address || "",
     city: prop.city || "",
     state: prop.state || "",
     country: prop.country || "",
-    type: prop.property_type ? prop.property_type.charAt(0).toUpperCase() + prop.property_type.slice(1) : "",
-    guests: prop.max_guests ?? 2,
-    bedrooms: prop.bedrooms ?? 0,
-    beds: prop.bedrooms ?? 0,
-    baths: prop.bathrooms ?? 0,
+    type: prop.property_type ? String(prop.property_type).charAt(0).toUpperCase() + String(prop.property_type).slice(1).toLowerCase() : "",
+    guests: prop.guest_count ?? 2,
+    bedrooms: prop.bedroom_count ?? 0,
+    beds: prop.bedroom_count ?? 0,
+    baths: prop.bathroom_count ?? 0,
     images: imageUrls.length > 0 ? imageUrls : [PLACEHOLDER_IMAGE],
-    price: prop.price_per_night ?? 0,
-    currency: "USD",
-    description: prop.description || "",
-    amenities: Array.isArray(prop.amenities) ? prop.amenities : [],
-    kosherKitchen: !!prop.kosher_kitchen,
-    shabbosFriendly: !!prop.shabbos_friendly,
+    price: prop.price ?? 0,
+    currency: prop.currency || "USD",
+    description: prop.additional_information || "",
+    amenities: prop.amenities || [],
+    kosherKitchen: prop.kosher_kitchen || false,
+    shabbosFriendly: prop.shabbos_friendly || false,
     nearbyShul: prop.nearby_shul || "",
     nearbyShulDistance: prop.nearby_shul_distance || "",
     nearbyMikva: prop.nearby_mikva || "",
     nearbyMikvaDistance: prop.nearby_mikva_distance || "",
     nearbyKosherShops: prop.nearby_kosher_shops || "",
     nearbyKosherShopsDistance: prop.nearby_kosher_shops_distance || "",
+    additionalLuxury: prop.additional_luxury || "",
   };
   } catch (error) {
     console.error("Error fetching property:", error);
@@ -101,11 +104,16 @@ async function fetchPropertyDetail(propertyId: string | undefined) {
 
 const PropertyDetail = () => {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const { formatPrice, preferredCurrency } = useCurrency();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [guestCount, setGuestCount] = useState(1);
   const [isFavorite, setIsFavorite] = useState(false);
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [isBooking, setIsBooking] = useState(false);
 
   const { data: propertyFromDb, isLoading } = useQuery({
     queryKey: ["property", id],
@@ -139,8 +147,7 @@ const PropertyDetail = () => {
       nearbyMikva: "",
       nearbyMikvaDistance: "",
       nearbyKosherShops: "",
-      nearbyKosherShopsDistance: "",
-    };
+      nearbyKosherShopsDistance: "",      additionalLuxury: "",    };
   }, [propertyFromDb, id]);
 
   const nextImage = () => {
@@ -162,6 +169,79 @@ const PropertyDetail = () => {
   const subtotal = property.price * nights;
   const serviceFee = Math.round(subtotal * 0.1);
   const total = subtotal + serviceFee;
+
+  const handleBooking = async () => {
+    if (!dateRange?.from || !dateRange?.to) {
+      toast.error("Please select check-in and check-out dates");
+      return;
+    }
+
+    if (!email || !phone) {
+      toast.error("Please provide your email and phone number");
+      return;
+    }
+
+    setIsBooking(true);
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+      const token = localStorage.getItem('auth_token');
+
+      // Token is optional - guests can book without logging in
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json'
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(`${API_URL}/api/reservations`, {
+        method: 'POST',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify({
+          property_id: property.id,
+          check_in_date: format(dateRange.from, "yyyy-MM-dd"),
+          check_out_date: format(dateRange.to, "yyyy-MM-dd"),
+          guest_count: guestCount,
+          total_price: total,
+          email: email,
+          phone: phone
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Server error' }));
+        console.error('Reservation error response:', error);
+        throw new Error(error.error || error.details || 'Failed to create reservation');
+      }
+
+      const reservation = await response.json();
+      console.log('Reservation created:', reservation);
+
+      if (user) {
+        toast.success("Booking request submitted successfully! The host will confirm your reservation.");
+      } else {
+        toast.success("Booking request submitted! We'll contact you at " + email + " to confirm.");
+      }
+      
+      // Reset form
+      setDateRange(undefined);
+      setGuestCount(1);
+      setEmail("");
+      setPhone("");
+      
+      // Navigate to dashboard or reservations page
+      setTimeout(() => {
+        navigate("/");
+      }, 2000);
+    } catch (error: any) {
+      console.error('Booking error:', error);
+      toast.error(error.message || "Failed to create booking. Please try again.");
+    } finally {
+      setIsBooking(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -335,101 +415,99 @@ const PropertyDetail = () => {
                 </CardContent>
               </Card>
 
+              {/* Luxury Features */}
+              {property.additionalLuxury && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Luxury Features</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                      {property.additionalLuxury}
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Amenities */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Amenities</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    {property.amenities.map((amenity) => (
-                      <div
-                        key={amenity}
-                        className="flex items-center gap-3 text-muted-foreground"
-                      >
-                        <Check className="h-5 w-5 text-primary" />
-                        {amenity}
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+              {property.amenities && property.amenities.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>What this place offers</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {property.amenities.map((amenity) => (
+                        <div key={amenity} className="flex items-center gap-2 text-muted-foreground">
+                          <Check className="h-5 w-5 text-primary flex-shrink-0" />
+                          <span>{amenity}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Kosher Features */}
-              <Card className="border-primary/20 bg-primary/5">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Star className="h-5 w-5 text-primary" />
-                    Kosher & Shabbos Features
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* Kosher Kitchen & Shabbos Friendly */}
-                  <div className="flex flex-wrap gap-4">
-                    {property.kosherKitchen && (
-                      <Badge
-                        variant="outline"
-                        className="border-primary text-primary px-4 py-2 text-base"
-                      >
-                        <Utensils className="h-4 w-4 mr-2" />
-                        Kosher Kitchen
-                      </Badge>
-                    )}
-                    {property.shabbosFriendly && (
-                      <Badge
-                        variant="outline"
-                        className="border-primary text-primary px-4 py-2 text-base"
-                      >
-                        <Star className="h-4 w-4 mr-2" />
-                        Shabbos Friendly
-                      </Badge>
-                    )}
-                  </div>
-
-                  {/* Nearby Facilities */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {property.nearbyShul && (
-                      <div>
-                        <h4 className="font-semibold text-foreground mb-1">
-                          Nearby Shul
-                        </h4>
-                        <p className="text-muted-foreground">
-                          {property.nearbyShul}
-                        </p>
-                        <p className="text-sm text-primary">
-                          {property.nearbyShulDistance}
-                        </p>
+              {(property.kosherKitchen || property.shabbosFriendly || property.nearbyShul || property.nearbyKosherShops || property.nearbyMikva) && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Kosher Features</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {(property.kosherKitchen || property.shabbosFriendly) && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {property.kosherKitchen && (
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <Utensils className="h-5 w-5 text-primary flex-shrink-0" />
+                            <span>Kosher Kitchen</span>
+                          </div>
+                        )}
+                        {property.shabbosFriendly && (
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <Check className="h-5 w-5 text-primary flex-shrink-0" />
+                            <span>Shabbos Friendly</span>
+                          </div>
+                        )}
                       </div>
                     )}
-                    {property.nearbyMikva && (
-                      <div>
-                        <h4 className="font-semibold text-foreground mb-1">
-                          Nearby Mikva
-                        </h4>
-                        <p className="text-muted-foreground">
-                          {property.nearbyMikva}
-                        </p>
-                        <p className="text-sm text-primary">
-                          {property.nearbyMikvaDistance}
-                        </p>
+                    {(property.nearbyShul || property.nearbyKosherShops || property.nearbyMikva) && (
+                      <div className="space-y-2">
+                        <h4 className="text-sm font-semibold text-foreground">Nearby Facilities</h4>
+                        <div className="grid grid-cols-1 gap-2">
+                          {property.nearbyShul && (
+                            <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                              <MapPin className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+                              <span>
+                                <strong>Shul:</strong> {property.nearbyShul} 
+                                {property.nearbyShulDistance && ` (${property.nearbyShulDistance})`}
+                              </span>
+                            </div>
+                          )}
+                          {property.nearbyKosherShops && (
+                            <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                              <MapPin className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+                              <span>
+                                <strong>Kosher Shop:</strong> {property.nearbyKosherShops}
+                                {property.nearbyKosherShopsDistance && ` (${property.nearbyKosherShopsDistance})`}
+                              </span>
+                            </div>
+                          )}
+                          {property.nearbyMikva && (
+                            <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                              <MapPin className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+                              <span>
+                                <strong>Mikva:</strong> {property.nearbyMikva}
+                                {property.nearbyMikvaDistance && ` (${property.nearbyMikvaDistance})`}
+                              </span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
-                    {property.nearbyKosherShops && (
-                      <div>
-                        <h4 className="font-semibold text-foreground mb-1">
-                          Kosher Shops
-                        </h4>
-                        <p className="text-muted-foreground">
-                          {property.nearbyKosherShops}
-                        </p>
-                        <p className="text-sm text-primary">
-                          {property.nearbyKosherShopsDistance}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              )}
             </div>
 
             {/* Right Column - Booking Form */}
@@ -553,28 +631,49 @@ const PropertyDetail = () => {
                   {/* Contact Info */}
                   <div className="space-y-2">
                     <Label>Your Email</Label>
-                    <Input type="email" placeholder="your@email.com" />
+                    <Input 
+                      type="email" 
+                      placeholder="your@email.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                    />
                   </div>
 
                   <div className="space-y-2">
                     <Label>Phone Number</Label>
-                    <Input type="tel" placeholder="+1 (555) 000-0000" />
+                    <Input 
+                      type="tel" 
+                      placeholder="+1 (555) 000-0000"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                    />
                   </div>
 
                   {/* Book Button */}
                   <Button
                     className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
                     size="lg"
-                    disabled={!dateRange?.from || !dateRange?.to}
+                    disabled={!dateRange?.from || !dateRange?.to || isBooking}
+                    onClick={handleBooking}
                   >
-                    {dateRange?.from && dateRange?.to
-                      ? `Reserve for ${formatPrice(total, property.currency)}`
-                      : "Select dates to book"}
+                    {isBooking ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Processing...
+                      </>
+                    ) : dateRange?.from && dateRange?.to ? (
+                      `Reserve for ${formatPrice(total, property.currency)}`
+                    ) : (
+                      "Select dates to book"
+                    )}
                   </Button>
 
                   <p className="text-xs text-center text-muted-foreground">
-                    You won't be charged yet. The host will confirm your
-                    booking.
+                    {user ? (
+                      "You won't be charged yet. The host will confirm your booking."
+                    ) : (
+                      "Book as a guest - we'll contact you via email to confirm."
+                    )}
                   </p>
                 </CardContent>
               </Card>

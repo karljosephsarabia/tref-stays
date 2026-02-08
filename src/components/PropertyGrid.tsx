@@ -31,15 +31,19 @@ const PROPERTY_TYPES = [
 interface PropertyWithImage {
   id: string;
   title: string;
-  property_type: string;
-  bedrooms: number | null;
-  bathrooms: number | null;
-  max_guests: number | null;
-  price_per_night: number | null;
+  property_type: string | number; // Can be string or integer from database
+  bedroom_count: number | null;
+  bathroom_count: number | null;
+  guest_count: number | null;
+  price: number | null;
+  currency: string | null;
+  street_name: string | null;
+  house_number: string | null;
   address: string | null;
   city: string | null;
   state: string | null;
   country: string | null;
+  map_address: string | null;
   zipcode: string | null;
   main_image: string | null;
 }
@@ -109,14 +113,18 @@ async function fetchProperties(
               id: p.id,
               title: p.title,
               property_type: p.property_type,
-              bedrooms: p.bedrooms,
-              bathrooms: p.bathrooms,
-              max_guests: p.max_guests,
-              price_per_night: p.price_per_night,
+              bedroom_count: p.bedroom_count,
+              bathroom_count: p.bathroom_count,
+              guest_count: p.guest_count,
+              price: p.price,
+              currency: p.currency || 'USD',
+              street_name: p.street_name,
+              house_number: p.house_number,
               address: p.address,
               city: p.city,
               state: p.state,
               country: p.country,
+              map_address: p.map_address,
               zipcode: p.zipcode,
               main_image: imageUrl,
             };
@@ -129,14 +137,18 @@ async function fetchProperties(
           id: p.id,
           title: p.title,
           property_type: p.property_type,
-          bedrooms: p.bedrooms,
-          bathrooms: p.bathrooms,
-          max_guests: p.max_guests,
-          price_per_night: p.price_per_night,
+          bedroom_count: p.bedroom_count,
+          bathroom_count: p.bathroom_count,
+          guest_count: p.guest_count,
+          price: p.price,
+          currency: p.currency || 'USD',
+          street_name: p.street_name,
+          house_number: p.house_number,
           address: p.address,
           city: p.city,
           state: p.state,
           country: p.country,
+          map_address: p.map_address,
           zipcode: p.zipcode,
           main_image: null,
         };
@@ -181,7 +193,13 @@ const PropertyGrid = ({ country = "", zipcode = "" }: PropertyGridProps) => {
   });
   console.log(properties);
   const locationDisplay = (p: PropertyWithImage) =>
-    [p.city, p.state, p.country].filter(Boolean).join(", ") || p.address || "—";
+    p.map_address || [p.city, p.state, p.country].filter(Boolean).join(", ") || p.address || "-";
+  
+  const formatPropertyType = (type: any) => {
+    if (!type) return "Property";
+    const typeStr = String(type); // Convert to string if it's a number
+    return typeStr.charAt(0).toUpperCase() + typeStr.slice(1).toLowerCase();
+  };
   
   const cardProps = useMemo(
     () =>
@@ -189,17 +207,17 @@ const PropertyGrid = ({ country = "", zipcode = "" }: PropertyGridProps) => {
         id: p.id,
         title: p.title,
         location: locationDisplay(p),
-        type: p.property_type?.charAt(0).toUpperCase() + (p.property_type?.slice(1) || ""),
-        guests: p.max_guests ?? 2,
-        bedrooms: p.bedrooms ?? 0,
-        beds: p.bedrooms ?? 0,
-        baths: p.bathrooms ?? 0,
+        type: formatPropertyType(p.property_type),
+        guests: p.guest_count ?? 2,
+        bedrooms: p.bedroom_count ?? 0,
+        beds: p.bedroom_count ?? 0,
+        baths: p.bathroom_count ?? 0,
         image:
           p.main_image ||
           "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=800&auto=format&fit=crop",
-        price: p.price_per_night ?? undefined,
-        currency: "USD",
-        country: p.state,
+        price: p.price ?? undefined,
+        currency: p.currency || "USD",
+        country: p.country,
         zipcode: p.zipcode,
         badge: (["NEW", "FEATURED", "HOT DEAL", null] as const)[i % 4 === 0 ? 0 : i % 4 === 1 ? 1 : i % 4 === 2 ? 2 : 3],
       })),

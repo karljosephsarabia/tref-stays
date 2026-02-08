@@ -27,19 +27,25 @@ interface PropertyFormData {
   // Basic Info
   title: string;
   property_type: string;
-  bedrooms: number;
-  bathrooms: number;
-  max_guests: number;
-  price_per_night: string;
+  bedroom_count: number;
+  bathroom_count: number;
+  guest_count: number;
+  price: string;
   currency: string;
   // Location
+  street_name: string;
+  house_number: string;
   address: string;
   city: string;
   state: string;
   country: string;
   zipcode: string;
+  map_lat: string;
+  map_lng: string;
+  map_address: string;
   // Description
-  description: string;
+  additional_information: string;
+  additional_luxury: string;
   amenities: string[];
   // Kosher amenities
   nearby_shul: string;
@@ -52,19 +58,6 @@ interface PropertyFormData {
   shabbos_friendly: boolean;
 }
 
-const COUNTRIES = [
-  { code: "us", name: "United States", flag: "🇺🇸", currency: "USD", symbol: "$" },
-  { code: "ca", name: "Canada", flag: "🇨🇦", currency: "CAD", symbol: "CA$" },
-  { code: "uk", name: "United Kingdom", flag: "🇬🇧", currency: "GBP", symbol: "£" },
-  { code: "be", name: "Belgium", flag: "🇧🇪", currency: "EUR", symbol: "€" },
-  { code: "il", name: "Israel", flag: "🇮🇱", currency: "ILS", symbol: "₪" },
-];
-
-const getCurrencyByCountry = (countryCode: string) => {
-  const country = COUNTRIES.find(c => c.code === countryCode);
-  return country || COUNTRIES[0];
-};
-
 interface StepErrors {
   [key: string]: string;
 }
@@ -72,17 +65,23 @@ interface StepErrors {
 const initialPropertyData: PropertyFormData = {
   title: "",
   property_type: "",
-  bedrooms: 1,
-  bathrooms: 1,
-  max_guests: 2,
-  price_per_night: "",
+  bedroom_count: 1,
+  bathroom_count: 1,
+  guest_count: 2,
+  price: "",
   currency: "USD",
+  street_name: "",
+  house_number: "",
   address: "",
   city: "",
   state: "",
   country: "",
   zipcode: "",
-  description: "",
+  map_lat: "",
+  map_lng: "",
+  map_address: "",
+  additional_information: "",
+  additional_luxury: "",
   amenities: [],
   nearby_shul: "",
   nearby_shul_distance: "",
@@ -93,6 +92,14 @@ const initialPropertyData: PropertyFormData = {
   kosher_kitchen: false,
   shabbos_friendly: false,
 };
+
+const COUNTRIES = [
+  { code: "us", name: "United States", flag: "🇺🇸", currency: "USD", symbol: "$" },
+  { code: "ca", name: "Canada", flag: "🇨🇦", currency: "CAD", symbol: "CA$" },
+  { code: "uk", name: "United Kingdom", flag: "🇬🇧", currency: "GBP", symbol: "£" },
+  { code: "be", name: "Belgium", flag: "🇧🇪", currency: "EUR", symbol: "€" },
+  { code: "il", name: "Israel", flag: "🇮🇱", currency: "ILS", symbol: "₪" },
+];
 
 const AMENITIES_OPTIONS = [
   "WiFi", "Air Conditioning", "Heating", "Kitchen", "Washer", "Dryer",
@@ -225,8 +232,8 @@ export default function Auth() {
       case 2: // Property Basics
         if (!propertyData.title.trim()) errors.title = "Property title is required";
         if (!propertyData.property_type) errors.property_type = "Property type is required";
-        if (!propertyData.price_per_night) errors.price_per_night = "Price per night is required";
-        else if (parseFloat(propertyData.price_per_night) <= 0) errors.price_per_night = "Price must be greater than 0";
+        if (!propertyData.price) errors.price = "Price per night is required";
+        else if (parseFloat(propertyData.price) <= 0) errors.price = "Price must be greater than 0";
         break;
       case 3: // Location
         if (!propertyData.address.trim()) errors.address = "Street address is required";
@@ -237,8 +244,8 @@ export default function Auth() {
         if (uploadedImages.length === 0) errors.images = "Please upload at least one property image";
         break;
       case 5: // Description
-        if (!propertyData.description.trim()) errors.description = "Property description is required";
-        else if (propertyData.description.length < 20) errors.description = "Description must be at least 20 characters";
+        if (!propertyData.additional_information.trim()) errors.additional_information = "Property description is required";
+        else if (propertyData.additional_information.length < 20) errors.additional_information = "Description must be at least 20 characters";
         break;
       case 6: // Kosher Amenities
         // Optional step, no required fields
@@ -303,18 +310,24 @@ export default function Auth() {
       // Step 2: Create property
       const propertyPayload = {
         title: propertyData.title,
-        description: propertyData.description,
         property_type: propertyData.property_type,
-        bedrooms: propertyData.bedrooms,
-        bathrooms: propertyData.bathrooms,
-        max_guests: propertyData.max_guests,
-        price_per_night: parseFloat(propertyData.price_per_night),
+        bedroom_count: propertyData.bedroom_count,
+        bathroom_count: propertyData.bathroom_count,
+        guest_count: propertyData.guest_count,
+        price: parseFloat(propertyData.price),
         currency: propertyData.currency,
+        street_name: propertyData.street_name,
+        house_number: propertyData.house_number,
         address: propertyData.address,
         city: propertyData.city,
         state: propertyData.state,
         country: propertyData.country,
         zipcode: propertyData.zipcode,
+        map_lat: propertyData.map_lat || null,
+        map_lng: propertyData.map_lng || null,
+        map_address: propertyData.map_address || null,
+        additional_luxury: propertyData.additional_luxury || null,
+        additional_information: propertyData.additional_information,
         amenities: propertyData.amenities,
         kosher_kitchen: propertyData.kosher_kitchen,
         shabbos_friendly: propertyData.shabbos_friendly,
@@ -832,8 +845,8 @@ export default function Auth() {
             id="bedrooms"
             type="number"
             min="1"
-            value={propertyData.bedrooms}
-            onChange={(e) => updatePropertyData("bedrooms", parseInt(e.target.value) || 1)}
+            value={propertyData.bedroom_count}
+            onChange={(e) => updatePropertyData("bedroom_count", parseInt(e.target.value) || 1)}
           />
         </div>
         <div className="space-y-2">
@@ -842,8 +855,8 @@ export default function Auth() {
             id="bathrooms"
             type="number"
             min="1"
-            value={propertyData.bathrooms}
-            onChange={(e) => updatePropertyData("bathrooms", parseInt(e.target.value) || 1)}
+            value={propertyData.bathroom_count}
+            onChange={(e) => updatePropertyData("bathroom_count", parseInt(e.target.value) || 1)}
           />
         </div>
         <div className="space-y-2">
@@ -852,8 +865,8 @@ export default function Auth() {
             id="maxGuests"
             type="number"
             min="1"
-            value={propertyData.max_guests}
-            onChange={(e) => updatePropertyData("max_guests", parseInt(e.target.value) || 1)}
+            value={propertyData.guest_count}
+            onChange={(e) => updatePropertyData("guest_count", parseInt(e.target.value) || 1)}
           />
         </div>
       </div>
@@ -876,7 +889,7 @@ export default function Auth() {
         </Select>
       </div>
       <div className="space-y-2">
-        <Label htmlFor="price">Price per Night ({getCurrencyByCountry(propertyData.country || "us").symbol})</Label>
+        <Label htmlFor="price">Price per Night ({COUNTRIES.find(c => c.currency === propertyData.currency)?.symbol || "$"})</Label>
         <div className="relative">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
             {COUNTRIES.find(c => c.currency === propertyData.currency)?.symbol || "$"}
@@ -885,13 +898,13 @@ export default function Auth() {
             id="price"
             type="number"
             min="0"
-            value={propertyData.price_per_night}
-            onChange={(e) => updatePropertyData("price_per_night", e.target.value)}
+            value={propertyData.price}
+            onChange={(e) => updatePropertyData("price", e.target.value)}
             placeholder="150"
-            className={`pl-10 ${stepErrors.price_per_night ? "border-destructive" : ""}`}
+            className={`pl-10 ${stepErrors.price ? "border-destructive" : ""}`}
           />
         </div>
-        <ErrorMessage field="price_per_night" />
+        <ErrorMessage field="price" />
       </div>
     </div>
   );
@@ -1047,14 +1060,25 @@ export default function Auth() {
         <Label htmlFor="description">Property Description</Label>
         <Textarea
           id="description"
-          value={propertyData.description}
-          onChange={(e) => updatePropertyData("description", e.target.value)}
+          value={propertyData.additional_information}
+          onChange={(e) => updatePropertyData("additional_information", e.target.value)}
           placeholder="Describe your property in detail. Mention special features, nearby attractions, and what makes it unique..."
-          className={`min-h-[120px] ${stepErrors.description ? "border-destructive" : ""}`}
+          className={`min-h-[120px] ${stepErrors.additional_information ? "border-destructive" : ""}`}
         />
-        <ErrorMessage field="description" />
+        <ErrorMessage field="additional_information" />
       </div>
       
+      {/* <div className="space-y-2">
+        <Label htmlFor="luxury">Luxury Features (Optional)</Label>
+        <Textarea
+          id="luxury"
+          value={propertyData.additional_luxury}
+          onChange={(e) => updatePropertyData("additional_luxury", e.target.value)}
+          placeholder="List any luxury amenities or special features (e.g., pool, hot tub, chef's kitchen, etc.)"
+          className="min-h-[80px]"
+        />
+      </div> */}
+
       <div className="space-y-2">
         <Label>Amenities</Label>
         <div className="grid grid-cols-2 gap-2">
@@ -1216,16 +1240,6 @@ export default function Auth() {
     </div>
   );
 
-  const getCountryName = (code: string) => {
-    const country = COUNTRIES.find(c => c.code === code);
-    return country?.name || code;
-  };
-
-  const getCurrencySymbol = () => {
-    const country = COUNTRIES.find(c => c.currency === propertyData.currency);
-    return country?.symbol || "$";
-  };
-
   const renderOwnerStep7 = () => (
     <div className="space-y-6">
       <div className="text-center mb-4">
@@ -1254,12 +1268,12 @@ export default function Auth() {
           <h2 className="text-xl font-bold">{propertyData.title || "Your Property Title"}</h2>
           <p className="text-muted-foreground flex items-center gap-1">
             <MapPin className="h-4 w-4" />
-            {[propertyData.city, propertyData.state, getCountryName(propertyData.country)].filter(Boolean).join(", ") || "Location"}
+            {[propertyData.city, propertyData.state, COUNTRIES.find(c => c.code === propertyData.country)?.name].filter(Boolean).join(", ") || propertyData.address || "Location"}
           </p>
         </div>
         <div className="text-right">
           <p className="text-2xl font-bold text-primary">
-            {getCurrencySymbol()}{propertyData.price_per_night || "0"}
+            {COUNTRIES.find(c => c.currency === propertyData.currency)?.symbol || "$"}{propertyData.price || "0"}
           </p>
           <p className="text-sm text-muted-foreground">per night ({propertyData.currency})</p>
         </div>
@@ -1269,23 +1283,31 @@ export default function Auth() {
       <div className="flex gap-4 p-4 bg-muted/50 rounded-lg">
         <div className="flex items-center gap-2">
           <Bed className="h-5 w-5 text-muted-foreground" />
-          <span>{propertyData.bedrooms} bed{propertyData.bedrooms > 1 ? "s" : ""}</span>
+          <span>{propertyData.bedroom_count} bed{propertyData.bedroom_count > 1 ? "s" : ""}</span>
         </div>
         <div className="flex items-center gap-2">
           <Bath className="h-5 w-5 text-muted-foreground" />
-          <span>{propertyData.bathrooms} bath{propertyData.bathrooms > 1 ? "s" : ""}</span>
+          <span>{propertyData.bathroom_count} bath{propertyData.bathroom_count > 1 ? "s" : ""}</span>
         </div>
         <div className="flex items-center gap-2">
           <Users className="h-5 w-5 text-muted-foreground" />
-          <span>{propertyData.max_guests} guest{propertyData.max_guests > 1 ? "s" : ""}</span>
+          <span>{propertyData.guest_count} guest{propertyData.guest_count > 1 ? "s" : ""}</span>
         </div>
       </div>
 
       {/* Description */}
       <div>
         <h4 className="font-semibold mb-2">About this property</h4>
-        <p className="text-muted-foreground">{propertyData.description || "No description provided"}</p>
+        <p className="text-muted-foreground">{propertyData.additional_information || "No description provided"}</p>
       </div>
+
+      {/* Luxury Features */}
+      {propertyData.additional_luxury && (
+        <div>
+          <h4 className="font-semibold mb-2">Luxury Features</h4>
+          <p className="text-muted-foreground">{propertyData.additional_luxury}</p>
+        </div>
+      )}
 
       {/* Amenities */}
       {propertyData.amenities.length > 0 && (
@@ -1302,41 +1324,43 @@ export default function Auth() {
       )}
 
       {/* Kosher Features */}
-      <div>
-        <h4 className="font-semibold mb-2">Kosher Features</h4>
-        <div className="grid grid-cols-2 gap-2 text-sm">
-          {propertyData.kosher_kitchen && (
-            <div className="flex items-center gap-2">
-              <Check className="h-4 w-4 text-green-600" />
-              <span>Kosher Kitchen</span>
-            </div>
-          )}
-          {propertyData.shabbos_friendly && (
-            <div className="flex items-center gap-2">
-              <Check className="h-4 w-4 text-green-600" />
-              <span>Shabbos Friendly</span>
-            </div>
-          )}
-          {propertyData.nearby_shul && (
-            <div className="flex items-center gap-2">
-              <MapPin className="h-4 w-4 text-muted-foreground" />
-              <span>Shul: {propertyData.nearby_shul} ({propertyData.nearby_shul_distance})</span>
-            </div>
-          )}
-          {propertyData.nearby_kosher_shops && (
-            <div className="flex items-center gap-2">
-              <MapPin className="h-4 w-4 text-muted-foreground" />
-              <span>Kosher Shop: {propertyData.nearby_kosher_shops} ({propertyData.nearby_kosher_shops_distance})</span>
-            </div>
-          )}
-          {propertyData.nearby_mikva && (
-            <div className="flex items-center gap-2">
-              <MapPin className="h-4 w-4 text-muted-foreground" />
-              <span>Mikva: {propertyData.nearby_mikva} ({propertyData.nearby_mikva_distance})</span>
-            </div>
-          )}
+      {(propertyData.kosher_kitchen || propertyData.shabbos_friendly || propertyData.nearby_shul || propertyData.nearby_kosher_shops || propertyData.nearby_mikva) && (
+        <div>
+          <h4 className="font-semibold mb-2">Kosher Features</h4>
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            {propertyData.kosher_kitchen && (
+              <div className="flex items-center gap-2">
+                <Check className="h-4 w-4 text-green-600" />
+                <span>Kosher Kitchen</span>
+              </div>
+            )}
+            {propertyData.shabbos_friendly && (
+              <div className="flex items-center gap-2">
+                <Check className="h-4 w-4 text-green-600" />
+                <span>Shabbos Friendly</span>
+              </div>
+            )}
+            {propertyData.nearby_shul && (
+              <div className="flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-muted-foreground" />
+                <span>Shul: {propertyData.nearby_shul} ({propertyData.nearby_shul_distance})</span>
+              </div>
+            )}
+            {propertyData.nearby_kosher_shops && (
+              <div className="flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-muted-foreground" />
+                <span>Kosher Shop: {propertyData.nearby_kosher_shops} ({propertyData.nearby_kosher_shops_distance})</span>
+              </div>
+            )}
+            {propertyData.nearby_mikva && (
+              <div className="flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-muted-foreground" />
+                <span>Mikva: {propertyData.nearby_mikva} ({propertyData.nearby_mikva_distance})</span>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* All Images Preview */}
       {imagePreviewUrls.length > 1 && (

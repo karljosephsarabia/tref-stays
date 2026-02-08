@@ -611,8 +611,13 @@ app.get('/api/env-check', (req, res) => {
 // Catch-all: serve index.html for client-side routing (must be after all API routes)
 const distPath2 = path.join(__dirname, 'dist');
 if (fs.existsSync(distPath2)) {
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(distPath2, 'index.html'));
+  app.use((req, res, next) => {
+    // Only handle GET requests for non-API routes
+    if (req.method === 'GET' && !req.path.startsWith('/api/') && !req.path.startsWith('/uploads/') && !req.path.startsWith('/health')) {
+      res.sendFile(path.join(distPath2, 'index.html'));
+    } else {
+      next();
+    }
   });
 }
 

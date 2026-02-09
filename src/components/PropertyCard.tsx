@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Users, BedDouble, Bath, Heart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCurrency } from "@/contexts/CurrencyContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 import {
   Tooltip,
   TooltipContent,
@@ -49,7 +51,88 @@ const PropertyCard = ({
   badge = null,
 }: PropertyCardProps) => {
   const { preferredCurrency, formatPrice } = useCurrency();
+  const { user } = useAuth();
   const [isFavorite, setIsFavorite] = useState(false);
+
+  // Check if property is saved on mount
+  useEffect(() => {
+    const checkIfSaved = async () => {
+      if (!user || !id) return;
+      
+      try {
+        const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+        const token = localStorage.getItem('auth_token');
+        
+        if (!token) return;
+        
+        const response = await fetch(`${API_URL}/api/saved-properties/check/${id}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          setIsFavorite(data.isSaved);
+        }
+      } catch (error) {
+        console.error('Error checking saved status:', error);
+      }
+    };
+    
+    checkIfSaved();
+  }, [id, user]);
+
+  const handleToggleFavorite = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!user) {
+      toast.error("Please log in to save properties");
+      return;
+    }
+
+    if (user.roleId !== 5) {
+      toast.error("Only renters can save properties");
+      return;
+    }
+
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+      const token = localStorage.getItem('auth_token');
+
+      if (isFavorite) {
+        // Unsave the property
+        const response = await fetch(`${API_URL}/api/saved-properties/${id}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (response.ok) {
+          setIsFavorite(false);
+          toast.success("Removed from favorites");
+        }
+      } else {
+        // Save the property
+        const response = await fetch(`${API_URL}/api/saved-properties/${id}`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (response.ok) {
+          setIsFavorite(true);
+          toast.success("Added to favorites");
+        }
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+      toast.error("Failed to update favorites");
+    }
+  };
 
   const showConversion = price && currency !== preferredCurrency.code;
   const originalPrice = price
@@ -97,11 +180,7 @@ const PropertyCard = ({
               variant="ghost"
               size="icon"
               className="absolute top-3 right-3 bg-white/90 hover:bg-white rounded-full shadow-md z-20"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setIsFavorite(!isFavorite);
-              }}
+              onClick={handleToggleFavorite}
             >
               <motion.div
                 animate={{ scale: isFavorite ? 1.2 : 1 }}

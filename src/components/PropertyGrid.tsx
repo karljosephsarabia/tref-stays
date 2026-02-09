@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Search, MapPin } from "lucide-react";
 import { useState, useMemo } from "react";
+import { format } from "date-fns";
 
 const PROPERTY_TYPES = [
   "All types",
@@ -56,6 +57,8 @@ async function fetchProperties(
     location: string;
     country: string;
     zipcode: string;
+    startDate?: Date;
+    endDate?: Date;
   }
 ): Promise<PropertyWithImage[]> {
   console.log('Fetching properties with filters:', filters);
@@ -80,6 +83,11 @@ async function fetchProperties(
   if (filters.zipcode.trim()) {
     params.append("zipcode", filters.zipcode.trim());
     console.log('Adding zipcode filter:', filters.zipcode);
+  }
+  if (filters.startDate && filters.endDate) {
+    params.append("start_date", format(filters.startDate, 'yyyy-MM-dd'));
+    params.append("end_date", format(filters.endDate, 'yyyy-MM-dd'));
+    console.log('Adding date range filter:', format(filters.startDate, 'yyyy-MM-dd'), 'to', format(filters.endDate, 'yyyy-MM-dd'));
   }
 
   const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
@@ -165,9 +173,11 @@ async function fetchProperties(
 interface PropertyGridProps {
   country?: string;
   zipcode?: string;
+  startDate?: Date;
+  endDate?: Date;
 }
 
-const PropertyGrid = ({ country = "", zipcode = "" }: PropertyGridProps) => {
+const PropertyGrid = ({ country = "", zipcode = "", startDate, endDate }: PropertyGridProps) => {
   const { preferredCurrency } = useCurrency();
   const [typeFilter, setTypeFilter] = useState("All types");
   const [minPrice, setMinPrice] = useState("");
@@ -183,8 +193,10 @@ const PropertyGrid = ({ country = "", zipcode = "" }: PropertyGridProps) => {
       location: appliedLocation,
       country,
       zipcode,
+      startDate,
+      endDate,
     }),
-    [typeFilter, minPrice, maxPrice, appliedLocation, country, zipcode]
+    [typeFilter, minPrice, maxPrice, appliedLocation, country, zipcode, startDate, endDate]
   );
 
   const { data: properties = [], isLoading } = useQuery({

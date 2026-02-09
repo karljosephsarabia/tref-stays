@@ -142,7 +142,7 @@ const optionalAuth = (req, res, next) => {
 // Auth Routes
 app.post('/api/auth/signup', async (req, res) => {
   try {
-    const { email, password, firstName, lastName, phone } = req.body;
+    const { email, password, firstName, lastName, phone, role } = req.body;
 
     // Check if user exists
     const existingUser = await pool.query('SELECT * FROM rs_users WHERE email = $1', [email]);
@@ -153,19 +153,22 @@ app.post('/api/auth/signup', async (req, res) => {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create user with role_id 5 (renter/customer)
+    // Assign role_id: 4 for property owners, 5 for renters/customers
+    const roleId = role === 'owner' ? 4 : 5;
+
+    // Create user with appropriate role
     const userResult = await pool.query(
-      'INSERT INTO rs_users (email, password, first_name, last_name, phone_number, role_id, active, activated) VALUES ($1, $2, $3, $4, $5, 5, true, true) RETURNING id, email, first_name, last_name, created_at',
-      [email, hashedPassword, firstName, lastName, phone]
+      'INSERT INTO rs_users (email, password, first_name, last_name, phone_number, role_id, active, activated) VALUES ($1, $2, $3, $4, $5, $6, true, true) RETURNING id, email, first_name, last_name, role_id, created_at',
+      [email, hashedPassword, firstName, lastName, phone, roleId]
     );
 
     const user = userResult.rows[0];
 
     // Generate JWT
-    const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ id: user.id, email: user.email, roleId: user.role_id }, JWT_SECRET, { expiresIn: '7d' });
 
     res.cookie('token', token, { httpOnly: true, maxAge: 7 * 24 * 60 * 60 * 1000 });
-    res.status(201).json({ user: { id: user.id, email: user.email, firstName: user.first_name, lastName: user.last_name }, token });
+    res.status(201).json({ user: { id: user.id, email: user.email, firstName: user.first_name, lastName: user.last_name, roleId: user.role_id }, token });
   } catch (error) {
     console.error('Signup error:', error);
     res.status(500).json({ error: 'Failed to create account' });
@@ -239,10 +242,16 @@ app.get('/api/auth/me', authenticateToken, async (req, res) => {
 // Get all properties
 app.get('/api/properties', async (req, res) => {
   try {
-    const { type, minPrice, maxPrice, city, zipcode } = req.query;
-    console.log('🔍 GET /api/properties - Query params:', { type, minPrice, maxPrice, city, zipcode });
+    const { type, minPrice, maxPrice, city, zipcode, includeInactive, start_date, end_date } = req.query;
+    console.log('🔍 GET /api/properties - Query params:', { type, minPrice, maxPrice, city, zipcode, includeInactive, start_date, end_date });
     
-    let query = 'SELECT * FROM rs_properties WHERE active = true';
+    let query = 'SELECT * FROM rs_properties WHERE 1=1';
+    
+    // Only filter by active if includeInactive is not set
+    if (!includeInactive) {
+      query += ' AND active = true';
+    }
+    
     const params = [];
     let paramCount = 1;
 
@@ -274,6 +283,22 @@ app.get('/api/properties', async (req, res) => {
       console.log('  ✓ Filtering by zipcode:', zipcode);
     }
 
+    // Filter by availability dates
+    if (start_date && end_date) {
+      query += ` AND id NOT IN (
+        SELECT property_id FROM property_availability
+        WHERE status IN ('blocked', 'booked')
+        AND (
+          (start_date <= $${paramCount} AND end_date >= $${paramCount})
+          OR (start_date <= $${paramCount + 1} AND end_date >= $${paramCount + 1})
+          OR (start_date >= $${paramCount} AND end_date <= $${paramCount + 1})
+        )
+      )`;
+      params.push(start_date, end_date);
+      paramCount += 2;
+      console.log('  ✓ Filtering by date range:', start_date, 'to', end_date);
+    }
+
     query += ' ORDER BY created_at DESC';
     console.log('  📝 Final query:', query);
     console.log('  📝 Query params:', params);
@@ -283,7 +308,9 @@ app.get('/api/properties', async (req, res) => {
     // Parse amenities from JSON string to array
     const properties = result.rows.map(property => ({
       ...property,
-      amenities: typeof property.amenities === 'string' ? JSON.parse(property.amenities) : (property.amenities || [])
+      amenities: typeof property.amenities === 'string' ? JSON.parse(property.amenities) : (property.amenities || []),
+      custom_kosher_amenities: typeof property.custom_kosher_amenities === 'string' ? JSON.parse(property.custom_kosher_amenities) : (property.custom_kosher_amenities || []),
+      custom_nearby_places: typeof property.custom_nearby_places === 'string' ? JSON.parse(property.custom_nearby_places) : (property.custom_nearby_places || [])
     }));
     
     console.log(`  ✅ Found ${properties.length} properties`);
@@ -307,7 +334,9 @@ app.get('/api/properties/:id', async (req, res) => {
     // Parse amenities from JSON string to array
     const property = {
       ...result.rows[0],
-      amenities: typeof result.rows[0].amenities === 'string' ? JSON.parse(result.rows[0].amenities) : (result.rows[0].amenities || [])
+      amenities: typeof result.rows[0].amenities === 'string' ? JSON.parse(result.rows[0].amenities) : (result.rows[0].amenities || []),
+      custom_kosher_amenities: typeof result.rows[0].custom_kosher_amenities === 'string' ? JSON.parse(result.rows[0].custom_kosher_amenities) : (result.rows[0].custom_kosher_amenities || []),
+      custom_nearby_places: typeof result.rows[0].custom_nearby_places === 'string' ? JSON.parse(result.rows[0].custom_nearby_places) : (result.rows[0].custom_nearby_places || [])
     };
 
     res.json(property);
@@ -329,7 +358,8 @@ app.post('/api/properties', authenticateToken, async (req, res) => {
       map_lat, map_lng, map_address, additional_luxury, additional_information,
       amenities, kosher_kitchen, shabbos_friendly,
       nearby_shul, nearby_shul_distance, nearby_kosher_shops, nearby_kosher_shops_distance,
-      nearby_mikva, nearby_mikva_distance
+      nearby_mikva, nearby_mikva_distance,
+      custom_kosher_amenities, custom_nearby_places
     } = req.body;
 
     // Use authenticated user's ID as owner_id
@@ -342,8 +372,8 @@ app.post('/api/properties', authenticateToken, async (req, res) => {
         map_lat, map_lng, map_address, additional_luxury, additional_information,
         amenities, kosher_kitchen, shabbos_friendly,
         nearby_shul, nearby_shul_distance, nearby_kosher_shops, nearby_kosher_shops_distance,
-        nearby_mikva, nearby_mikva_distance, active
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, true)
+        nearby_mikva, nearby_mikva_distance, custom_kosher_amenities, custom_nearby_places, active
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, true)
       RETURNING *
     `, [
       owner_id, title, property_type, bedroom_count, bathroom_count, guest_count,
@@ -351,7 +381,8 @@ app.post('/api/properties', authenticateToken, async (req, res) => {
       map_lat, map_lng, map_address, additional_luxury, additional_information,
       amenities ? JSON.stringify(amenities) : '[]', kosher_kitchen || false, shabbos_friendly || false,
       nearby_shul || null, nearby_shul_distance || null, nearby_kosher_shops || null, nearby_kosher_shops_distance || null,
-      nearby_mikva || null, nearby_mikva_distance || null
+      nearby_mikva || null, nearby_mikva_distance || null,
+      custom_kosher_amenities ? JSON.stringify(custom_kosher_amenities) : '[]', custom_nearby_places ? JSON.stringify(custom_nearby_places) : '[]'
     ]);
 
     console.log('Property created successfully:', result.rows[0].id);
@@ -367,17 +398,24 @@ app.post('/api/properties', authenticateToken, async (req, res) => {
 app.put('/api/properties/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const updates = req.body;
+    const updates = { ...req.body };
+    
+    // Ensure JSON fields are stringified if they were sent as arrays/objects
+    ['amenities', 'custom_kosher_amenities', 'custom_nearby_places'].forEach((field) => {
+      if (updates[field] && typeof updates[field] !== 'string') {
+        updates[field] = JSON.stringify(updates[field]);
+      }
+    });
     
     const setClause = Object.keys(updates)
-      .map((key, index) => `${key} = $${index + 2}`)
+      .map((key, index) => `${key} = $${index + 3}`)
       .join(', ');
     
-    const values = [id, ...Object.values(updates)];
+    const values = [id, req.user.id, ...Object.values(updates)];
 
     const result = await pool.query(
       `UPDATE rs_properties SET ${setClause}, updated_at = NOW() WHERE id = $1 AND owner_id = $2 RETURNING *`,
-      [id, req.user.id, ...Object.values(updates)]
+      values
     );
 
     if (result.rows.length === 0) {
@@ -487,6 +525,165 @@ app.post('/api/properties/:id/images', authenticateToken, async (req, res) => {
   }
 });
 
+// Property Availability Routes
+
+// Check if property is available for a date range
+app.get('/api/properties/:id/availability', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { start_date, end_date } = req.query;
+
+    if (!start_date || !end_date) {
+      return res.status(400).json({ error: 'start_date and end_date are required' });
+    }
+
+    // Check for any conflicting bookings or blocks
+    const result = await pool.query(`
+      SELECT * FROM property_availability
+      WHERE property_id = $1
+      AND status IN ('blocked', 'booked')
+      AND (
+        (start_date <= $2 AND end_date >= $2)
+        OR (start_date <= $3 AND end_date >= $3)
+        OR (start_date >= $2 AND end_date <= $3)
+      )
+    `, [id, start_date, end_date]);
+
+    const isAvailable = result.rows.length === 0;
+    res.json({ 
+      available: isAvailable, 
+      conflicts: result.rows 
+    });
+  } catch (error) {
+    console.error('Error checking availability:', error);
+    res.status(500).json({ error: 'Failed to check availability' });
+  }
+});
+
+// Get all unavailable dates for a property (for calendar display)
+app.get('/api/properties/:id/unavailable-dates', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await pool.query(`
+      SELECT start_date, end_date, status, notes
+      FROM property_availability
+      WHERE property_id = $1
+      AND status IN ('blocked', 'booked')
+      ORDER BY start_date
+    `, [id]);
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching unavailable dates:', error);
+    res.status(500).json({ error: 'Failed to fetch unavailable dates' });
+  }
+});
+
+// Block or unblock dates (owner only)
+app.post('/api/properties/:id/block-dates', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { start_date, end_date, notes, unblock } = req.body;
+
+    // Verify property ownership
+    const propertyCheck = await pool.query(
+      'SELECT owner_id FROM rs_properties WHERE id = $1',
+      [id]
+    );
+
+    if (propertyCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Property not found' });
+    }
+
+    if (propertyCheck.rows[0].owner_id !== req.user.id) {
+      return res.status(403).json({ error: 'Not authorized to manage this property' });
+    }
+
+    if (unblock) {
+      // Remove blocked dates
+      await pool.query(`
+        DELETE FROM property_availability
+        WHERE property_id = $1
+        AND status = 'blocked'
+        AND start_date = $2
+        AND end_date = $3
+      `, [id, start_date, end_date]);
+
+      res.json({ success: true, message: 'Dates unblocked successfully' });
+    } else {
+      // Validate dates
+      if (!start_date || !end_date) {
+        return res.status(400).json({ error: 'start_date and end_date are required' });
+      }
+
+      // Check for conflicts
+      const conflicts = await pool.query(`
+        SELECT * FROM property_availability
+        WHERE property_id = $1
+        AND (
+          (start_date <= $2 AND end_date >= $2)
+          OR (start_date <= $3 AND end_date >= $3)
+          OR (start_date >= $2 AND end_date <= $3)
+        )
+      `, [id, start_date, end_date]);
+
+      if (conflicts.rows.length > 0) {
+        return res.status(409).json({ 
+          error: 'Date range conflicts with existing bookings or blocks',
+          conflicts: conflicts.rows 
+        });
+      }
+
+      // Block dates
+      const result = await pool.query(`
+        INSERT INTO property_availability (property_id, start_date, end_date, status, notes)
+        VALUES ($1, $2, $3, 'blocked', $4)
+        RETURNING *
+      `, [id, start_date, end_date, notes || null]);
+
+      res.status(201).json(result.rows[0]);
+    }
+  } catch (error) {
+    console.error('Error managing blocked dates:', error);
+    res.status(500).json({ error: 'Failed to manage blocked dates' });
+  }
+});
+
+// Get blocked date ranges (owner only)
+app.get('/api/properties/:id/blocked-dates', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Verify property ownership
+    const propertyCheck = await pool.query(
+      'SELECT owner_id FROM rs_properties WHERE id = $1',
+      [id]
+    );
+
+    if (propertyCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Property not found' });
+    }
+
+    if (propertyCheck.rows[0].owner_id !== req.user.id) {
+      return res.status(403).json({ error: 'Not authorized to view this property' });
+    }
+
+    const result = await pool.query(`
+      SELECT id, start_date, end_date, notes, created_at
+      FROM property_availability
+      WHERE property_id = $1
+      AND status = 'blocked'
+      ORDER BY start_date
+    `, [id]);
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching blocked dates:', error);
+    res.status(500).json({ error: 'Failed to fetch blocked dates' });
+  }
+});
+
 // Reservation Routes
 
 // Create reservation (guests allowed)
@@ -517,8 +714,8 @@ app.post('/api/reservations', optionalAuth, async (req, res) => {
     const result = await pool.query(`
       INSERT INTO rs_reservations (
         property_id, customer_id, date_start, date_end, 
-        guest_count, total_price, email, phone
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        guest_count, total_price, email, phone, status
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING *
     `, [
       property_id,
@@ -528,7 +725,8 @@ app.post('/api/reservations', optionalAuth, async (req, res) => {
       guest_count,
       total_price,
       email || null,
-      phone || null
+      phone || null,
+      'pending'
     ]);
 
     console.log('Reservation created successfully:', result.rows[0].id);
@@ -544,14 +742,40 @@ app.post('/api/reservations', optionalAuth, async (req, res) => {
 app.get('/api/reservations/my', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT r.*, p.title as property_title, p.city, p.state, p.country
+      SELECT r.*, 
+             p.title as property_title, 
+             p.address as property_address,
+             p.city, 
+             p.state, 
+             p.country,
+             p.currency,
+             p.id as property_id
       FROM rs_reservations r
       JOIN rs_properties p ON r.property_id = p.id
       WHERE r.customer_id = $1
       ORDER BY r.created_at DESC
     `, [req.user.id]);
     
-    res.json(result.rows);
+    // Fetch main image for each property
+    const reservationsWithImages = await Promise.all(
+      result.rows.map(async (reservation) => {
+        try {
+          const imageResult = await pool.query(
+            'SELECT image_url FROM rs_property_images WHERE property_id = $1 ORDER BY id ASC LIMIT 1',
+            [reservation.property_id]
+          );
+          return {
+            ...reservation,
+            main_image: imageResult.rows[0]?.image_url || null
+          };
+        } catch (err) {
+          console.error(`Error fetching image for property ${reservation.property_id}:`, err);
+          return reservation;
+        }
+      })
+    );
+    
+    res.json(reservationsWithImages);
   } catch (error) {
     console.error('Error fetching reservations:', error);
     res.status(500).json({ error: 'Failed to fetch reservations' });
@@ -573,10 +797,10 @@ app.get('/api/reservations/test', async (req, res) => {
     const testInsert = await pool.query(`
       INSERT INTO rs_reservations (
         property_id, customer_id, date_start, date_end, 
-        guest_count, total_price, email, phone
-      ) VALUES ($1, NULL, $2, $3, $4, $5, $6, $7)
+        guest_count, total_price, email, phone, status
+      ) VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, $8)
       RETURNING *
-    `, [1, '2026-03-01', '2026-03-05', 2, 500, 'test@example.com', '+1234567890']);
+    `, [1, '2026-03-01', '2026-03-05', 2, 500, 'test@example.com', '+1234567890', 'pending']);
     
     res.json({ 
       tableStructure: tableInfo.rows,
@@ -589,6 +813,166 @@ app.get('/api/reservations/test', async (req, res) => {
       tableStructure: 'Check failed',
       success: false 
     });
+  }
+});
+
+// Update reservation status
+app.patch('/api/reservations/:id/status', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    // Validate status
+    const validStatuses = ['pending', 'confirmed', 'approved', 'cancelled', 'completed'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ error: 'Invalid status value' });
+    }
+
+    // Check if reservation exists and user is authorized
+    const checkResult = await pool.query(`
+      SELECT r.*, p.owner_id 
+      FROM rs_reservations r
+      JOIN rs_properties p ON r.property_id = p.id
+      WHERE r.id = $1
+    `, [id]);
+
+    if (checkResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Reservation not found' });
+    }
+
+    const reservation = checkResult.rows[0];
+    
+    // Only property owner or the customer can update status
+    const isOwner = reservation.owner_id === req.user.id;
+    const isCustomer = reservation.customer_id === req.user.id;
+    
+    if (!isOwner && !isCustomer) {
+      return res.status(403).json({ error: 'Not authorized to update this reservation' });
+    }
+
+    // Update status
+    const result = await pool.query(`
+      UPDATE rs_reservations 
+      SET status = $1, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $2
+      RETURNING *
+    `, [status, id]);
+
+    console.log(`Reservation ${id} status updated to ${status} by user ${req.user.id}`);
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error updating reservation status:', error);
+    res.status(500).json({ error: 'Failed to update reservation status' });
+  }
+});
+
+// Get user's saved properties
+app.get('/api/saved-properties', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const result = await pool.query(`
+      SELECT 
+        sp.id as saved_id,
+        sp.created_at as saved_at,
+        p.id,
+        p.title,
+        p.address,
+        p.city,
+        p.state,
+        p.country,
+        p.price,
+        p.currency,
+        p.property_type,
+        p.bedroom_count,
+        p.bathroom_count,
+        p.guest_count,
+        (SELECT image_url FROM rs_property_images WHERE property_id = p.id ORDER BY id ASC LIMIT 1) as main_image
+      FROM rs_saved_properties sp
+      JOIN rs_properties p ON sp.property_id = p.id
+      WHERE sp.user_id = $1
+      ORDER BY sp.created_at DESC
+    `, [userId]);
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching saved properties:', error);
+    res.status(500).json({ error: 'Failed to fetch saved properties' });
+  }
+});
+
+// Save a property (add to favorites)
+app.post('/api/saved-properties/:propertyId', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { propertyId } = req.params;
+
+    // Check if property exists
+    const propertyCheck = await pool.query('SELECT id FROM rs_properties WHERE id = $1', [propertyId]);
+    if (propertyCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Property not found' });
+    }
+
+    // Insert or ignore if already saved
+    const result = await pool.query(`
+      INSERT INTO rs_saved_properties (user_id, property_id)
+      VALUES ($1, $2)
+      ON CONFLICT (user_id, property_id) DO NOTHING
+      RETURNING *
+    `, [userId, propertyId]);
+
+    if (result.rows.length === 0) {
+      // Already saved
+      return res.status(200).json({ message: 'Property already saved', alreadySaved: true });
+    }
+
+    console.log(`User ${userId} saved property ${propertyId}`);
+    res.status(201).json({ message: 'Property saved successfully', saved: result.rows[0] });
+  } catch (error) {
+    console.error('Error saving property:', error);
+    res.status(500).json({ error: 'Failed to save property' });
+  }
+});
+
+// Remove a saved property (unlike/unfavorite)
+app.delete('/api/saved-properties/:propertyId', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { propertyId } = req.params;
+
+    const result = await pool.query(`
+      DELETE FROM rs_saved_properties
+      WHERE user_id = $1 AND property_id = $2
+      RETURNING *
+    `, [userId, propertyId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Saved property not found' });
+    }
+
+    console.log(`User ${userId} removed property ${propertyId} from saved`);
+    res.json({ message: 'Property removed from saved' });
+  } catch (error) {
+    console.error('Error removing saved property:', error);
+    res.status(500).json({ error: 'Failed to remove saved property' });
+  }
+});
+
+// Check if property is saved by user
+app.get('/api/saved-properties/check/:propertyId', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { propertyId } = req.params;
+
+    const result = await pool.query(`
+      SELECT id FROM rs_saved_properties
+      WHERE user_id = $1 AND property_id = $2
+    `, [userId, propertyId]);
+
+    res.json({ isSaved: result.rows.length > 0 });
+  } catch (error) {
+    console.error('Error checking saved property:', error);
+    res.status(500).json({ error: 'Failed to check saved property' });
   }
 });
 

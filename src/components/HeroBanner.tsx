@@ -29,7 +29,7 @@ const itemUp = {
 };
 
 interface HeroBannerProps {
-  onSearch: (country: string, zipcode: string) => void;
+  onSearch: (country: string, zipcode: string, dateRange?: DateRange) => void;
 }
 
 const HeroBanner = ({ onSearch }: HeroBannerProps) => {
@@ -285,7 +285,7 @@ const HeroBanner = ({ onSearch }: HeroBannerProps) => {
                 {/* Search Button - Positioned absolutely on desktop */}
                 <div className="p-4 lg:absolute lg:right-[-74px] lg:top-1/2 lg:-translate-y-1/2 flex justify-center">
                   <Button
-                    onClick={() => onSearch(country, zipcode)}
+                    onClick={() => onSearch(country, zipcode, dateRange)}
                     className="w-full lg:w-40 lg:h-40 h-14 rounded-full bg-gradient-to-br from-blue-500 via-blue-600 to-blue-700 hover:from-blue-600 hover:via-blue-700 hover:to-blue-800 text-white shadow-2xl hover:shadow-blue-500/50 transition-all duration-300 hover:scale-105 active:scale-95 flex flex-row lg:flex-col items-center justify-center gap-1 lg:gap-2 font-bold"
                   >
                     <Search className="!h-6 !w-6 lg:!h-10 lg:!w-10" />

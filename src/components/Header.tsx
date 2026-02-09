@@ -46,7 +46,7 @@ function NavLink({
   );
 }
 
-const Header = () => {
+const Header = ({ hideMenu = false }: { hideMenu?: boolean }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, signOut } = useAuth();
@@ -99,31 +99,33 @@ const Header = () => {
             />
           </Link>
 
-          <nav className="hidden md:flex items-center gap-6 lg:gap-8">
-            <NavLink
-              to="/"
-              className={cn(linkBase, linkStyle, "py-2")}
-            >
-              Properties
-            </NavLink>
-            {user ? (
-              <>
-                <NavLink to="/list-property" className={cn(linkBase, linkStyle, "py-2")}>
-                  List Property
-                </NavLink>
-                <NavLink to="/dashboard" className={cn(linkBase, linkStyle, "py-2")}>
-                  Dashboard
-                </NavLink>
-              </>
-            ) : (
-              <NavLink to="/auth" className={cn(linkBase, linkStyle, "py-2")}>
-                List Your Property
+          {!hideMenu && (
+            <nav className="hidden md:flex items-center gap-6 lg:gap-8">
+              <NavLink
+                to="/"
+                className={cn(linkBase, linkStyle, "py-2")}
+              >
+                Properties
               </NavLink>
-            )}
-            <NavLink to="/about" className={cn(linkBase, linkStyle, "py-2")}>
-              About
-            </NavLink>
-          </nav>
+              {user ? (
+                <>
+                  <NavLink to="/list-property" className={cn(linkBase, linkStyle, "py-2")}>
+                    List Property
+                  </NavLink>
+                  <NavLink to="/dashboard" className={cn(linkBase, linkStyle, "py-2")}>
+                    Dashboard
+                  </NavLink>
+                </>
+              ) : (
+                <NavLink to="/auth" className={cn(linkBase, linkStyle, "py-2")}>
+                  List Your Property
+                </NavLink>
+              )}
+              <NavLink to="/about" className={cn(linkBase, linkStyle, "py-2")}>
+                About
+              </NavLink>
+            </nav>
+          )}
 
           <div className="hidden md:flex items-center gap-3">
             {user ? (
@@ -175,7 +177,8 @@ const Header = () => {
             )}
           </div>
 
-          <div className="flex md:hidden items-center gap-2">
+          {!hideMenu && (
+            <div className="flex md:hidden items-center gap-2">
             {!user && (
               <Button
                 size="sm"
@@ -270,7 +273,8 @@ const Header = () => {
                 </nav>
               </SheetContent>
             </Sheet>
-          </div>
+            </div>
+          )}
         </div>
       </div>
     </motion.header>

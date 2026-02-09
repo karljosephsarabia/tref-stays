@@ -216,7 +216,8 @@ export default function Auth() {
       await signUp(email, password, {
         firstName,
         lastName,
-        phone
+        phone,
+        role: 'renter'
       });
 
       toast.success("Account created successfully!");
@@ -281,11 +282,12 @@ export default function Auth() {
 
     setLoading(true);
     try {
-      // Create user account
+      // Create user account with owner role
       await signUp(email, password, {
         firstName,
         lastName,
-        phone
+        phone,
+        role: 'owner'
       });
 
       // Get the auth token for property creation

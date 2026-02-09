@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
@@ -33,7 +33,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { useCurrency, CURRENCIES } from "@/contexts/CurrencyContext";
-import { format, differenceInDays } from "date-fns";
+import { format, differenceInDays, eachDayOfInterval, parseISO } from "date-fns";
 import { DateRange } from "react-day-picker";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -128,12 +128,136 @@ const PropertyDetail = () => {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [isBooking, setIsBooking] = useState(false);
+  const [unavailableDates, setUnavailableDates] = useState<Date[]>([]);
 
   const { data: propertyFromDb, isLoading } = useQuery({
     queryKey: ["property", id],
     queryFn: () => fetchPropertyDetail(id),
     enabled: !!id,
   });
+
+  // Pre-fill email and phone for renter role only (roleId = 5)
+  useEffect(() => {
+    if (user && user.roleId === 5) {
+      if (user.email) {
+        setEmail(user.email);
+      }
+      if (user.phone) {
+        setPhone(user.phone);
+      }
+    }
+  }, [user]);
+
+  // Fetch unavailable dates for the property
+  useEffect(() => {
+    const fetchUnavailableDates = async () => {
+      if (!id) return;
+      
+      try {
+        const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+        const response = await fetch(`${API_URL}/api/properties/${id}/unavailable-dates`);
+        
+        if (!response.ok) {
+          console.error('Failed to fetch unavailable dates');
+          return;
+        }
+        
+        const data = await response.json();
+        
+        // Convert date ranges to individual Date objects
+        const dates: Date[] = [];
+        data.forEach((range: { start_date: string; end_date: string }) => {
+          const start = parseISO(range.start_date);
+          const end = parseISO(range.end_date);
+          const datesInRange = eachDayOfInterval({ start, end });
+          dates.push(...datesInRange);
+        });
+        
+        setUnavailableDates(dates);
+      } catch (error) {
+        console.error('Error fetching unavailable dates:', error);
+      }
+    };
+    
+    fetchUnavailableDates();
+  }, [id]);
+
+  // Check if property is saved by user
+  useEffect(() => {
+    const checkIfSaved = async () => {
+      if (!id || !user) return;
+      
+      try {
+        const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+        const token = localStorage.getItem('auth_token');
+        
+        if (!token) return;
+        
+        const response = await fetch(`${API_URL}/api/saved-properties/check/${id}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          setIsFavorite(data.isSaved);
+        }
+      } catch (error) {
+        console.error('Error checking saved status:', error);
+      }
+    };
+    
+    checkIfSaved();
+  }, [id, user]);
+
+  const handleToggleFavorite = async () => {
+    if (!user) {
+      toast.error("Please log in to save properties");
+      return;
+    }
+
+    if (user.roleId !== 5) {
+      toast.error("Only renters can save properties");
+      return;
+    }
+
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+      const token = localStorage.getItem('auth_token');
+
+      if (isFavorite) {
+        // Unsave the property
+        const response = await fetch(`${API_URL}/api/saved-properties/${id}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (response.ok) {
+          setIsFavorite(false);
+          toast.success("Removed from favorites");
+        }
+      } else {
+        // Save the property
+        const response = await fetch(`${API_URL}/api/saved-properties/${id}`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (response.ok) {
+          setIsFavorite(true);
+          toast.success("Added to favorites");
+        }
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+      toast.error("Failed to update favorites");
+    }
+  };
 
   const property = useMemo(() => {
     if (propertyFromDb) return propertyFromDb;
@@ -343,7 +467,7 @@ const PropertyDetail = () => {
                   variant="ghost"
                   size="icon"
                   className="bg-background/80 hover:bg-background rounded-full h-8 w-8 md:h-10 md:w-10"
-                  onClick={() => setIsFavorite(!isFavorite)}
+                  onClick={handleToggleFavorite}
                 >
                   <Heart
                     className={`h-4 w-4 md:h-5 md:w-5 ${isFavorite ? "fill-destructive text-destructive" : ""}`}
@@ -432,7 +556,7 @@ const PropertyDetail = () => {
                   variant="ghost"
                   size="icon"
                   className="bg-background/80 hover:bg-background rounded-full h-8 w-8"
-                  onClick={() => setIsFavorite(!isFavorite)}
+                  onClick={handleToggleFavorite}
                 >
                   <Heart
                     className={`h-4 w-4 ${isFavorite ? "fill-destructive text-destructive" : ""}`}
@@ -683,7 +807,18 @@ const PropertyDetail = () => {
                           selected={dateRange}
                           onSelect={setDateRange}
                           numberOfMonths={1}
-                          disabled={(date) => date < new Date()}
+                          disabled={(date) => {
+                            // Disable past dates
+                            const today = new Date();
+                            today.setHours(0, 0, 0, 0);
+                            if (date < today) return true;
+                            
+                            // Disable unavailable dates (blocked or booked)
+                            return unavailableDates.some(
+                              unavailableDate => 
+                                unavailableDate.getTime() === date.getTime()
+                            );
+                          }}
                           className="pointer-events-auto"
                         />
                       </PopoverContent>

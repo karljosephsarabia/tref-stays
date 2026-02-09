@@ -6,12 +6,13 @@ interface User {
   first_name?: string;
   last_name?: string;
   phone?: string;
+  roleId?: number;
 }
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  signUp: (email: string, password: string, data?: { firstName?: string; lastName?: string; phone?: string }) => Promise<void>;
+  signUp: (email: string, password: string, data?: { firstName?: string; lastName?: string; phone?: string; role?: 'renter' | 'owner' }) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -57,7 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const signUp = async (email: string, password: string, data?: { firstName?: string; lastName?: string; phone?: string }) => {
+  const signUp = async (email: string, password: string, data?: { firstName?: string; lastName?: string; phone?: string; role?: 'renter' | 'owner' }) => {
     try {
       const response = await fetch(`${API_URL}/api/auth/signup`, {
         method: 'POST',
@@ -68,7 +69,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           password,
           firstName: data?.firstName,
           lastName: data?.lastName,
-          phone: data?.phone
+          phone: data?.phone,
+          role: data?.role || 'renter'
         })
       });
 
